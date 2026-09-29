@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=Coreboard
+GenericName=Centre de contrôle matériel
+Comment=Profils de performance, GPU, écran et monitoring de votre PC
+Exec=coreboard
+Icon=coreboard
+Terminal=false
+StartupWMClass=dev.coreboard.Coreboard
+Categories=Settings;HardwareSettings;
+Keywords=hardware;gpu;fan;performance;monitor;battery;matériel;

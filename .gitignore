@@ -1,0 +1,5 @@
+coreboard
+tests/hwtest
+*.o
+*.log
+.DS_Store

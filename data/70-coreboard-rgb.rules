@@ -1,0 +1,3 @@
+# Coreboard : accès (utilisateur connecté) à l'éclairage RGB du clavier MSI MysticLight
+KERNEL=="hidraw*", ATTRS{idVendor}=="1462", ATTRS{idProduct}=="1601", TAG+="uaccess"
+KERNEL=="hidraw*", ATTRS{idVendor}=="0db0", ATTRS{idProduct}=="1801", TAG+="uaccess"

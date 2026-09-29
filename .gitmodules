@@ -1,0 +1,3 @@
+[submodule "fistgirl"]
+	path = fistgirl
+	url = https://github.com/sagarchaulagai/fistgirl.git

@@ -2047,9 +2047,15 @@ static void page_fitgirl(cairo_t *cr) {
     /* ---- Résultats ---- */
     FgSearchHit hits[MAXFG_RESULTS];
     int nhits = fx_fg_results(hits, MAXFG_RESULTS);
-    if (nhits == 0 && *q) {
+    gboolean searching = fx_fg_search_busy();
+    if (*q && searching) {
+        /* Recherche en cours */
         text(cr, "Recherche en cours…", X0, cy + 14, 12.5, 400, F_SANS, C_MUTE, 1, 0, 0);
         schedule_redraw(500);
+        cy += 40;
+    } else if (*q && nhits == 0) {
+        /* Recherche terminée, aucun résultat */
+        text(cr, "Aucun résultat trouvé. Essaie un autre terme.", X0, cy + 14, 12.5, 400, F_SANS, C_MUTE, 1, 0, 0);
         cy += 40;
     } else if (nhits > 0) {
         double gap = 12;
@@ -2068,6 +2074,7 @@ static void page_fitgirl(cairo_t *cr) {
         }
         cy += ((nhits + cols - 1) / cols) * (98 + gap) + 12;
     }
+
 
     /* ---- Jeu sélectionné (résolution en cours ou terminée) ---- */
     cy += 10;

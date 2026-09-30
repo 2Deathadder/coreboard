@@ -1199,6 +1199,7 @@ static FgSearchHit fg_results_cache[MAXFG_RESULTS];
 static int fg_nresults;
 static char fg_query_str[128];
 static gboolean fg_search_busy;
+static gboolean fg_search_done;   /* TRUE une fois la première recherche terminée */
 
 typedef struct { char query[128]; } FgSearchArg;
 
@@ -1227,14 +1228,15 @@ static gpointer fg_search_thread(gpointer d) {
         g_object_unref(jp); g_free(out);
     }
     g_mutex_lock(&fg_search_lock);
-    memcpy(fg_results_cache, tmp, n * sizeof(FgSearchHit)); fg_nresults = n; fg_search_busy = FALSE;
+    memcpy(fg_results_cache, tmp, n * sizeof(FgSearchHit));
+    fg_nresults = n; fg_search_busy = FALSE; fg_search_done = TRUE;
     g_mutex_unlock(&fg_search_lock);
     return NULL;
 }
 
 void fx_fg_search(const char *query) {
     g_mutex_lock(&fg_search_lock);
-    gboolean go = !fg_search_busy; fg_search_busy = TRUE;
+    gboolean go = !fg_search_busy; fg_search_busy = TRUE; fg_search_done = FALSE;
     g_strlcpy(fg_query_str, query, sizeof fg_query_str);
     fg_nresults = 0;
     g_mutex_unlock(&fg_search_lock);
@@ -1252,7 +1254,12 @@ int fx_fg_results(FgSearchHit *out, int max) {
     return n;
 }
 
+gboolean fx_fg_search_busy(void) {
+    g_mutex_lock(&fg_search_lock); gboolean b = fg_search_busy; g_mutex_unlock(&fg_search_lock); return b;
+}
+
 const char *fx_fg_query(void) { return fg_query_str; }
+
 
 /* ---- Résolution d'URL → liste de fichiers ---- */
 static GMutex fg_resolve_lock;

@@ -132,6 +132,7 @@ typedef struct {
 /* Recherche de repacks dans le catalogue FitGirl */
 void     fx_fg_search(const char *query);      /* lance en tâche de fond */
 int      fx_fg_results(FgSearchHit *out, int max);
+gboolean fx_fg_search_busy(void);               /* TRUE tant que la recherche tourne */
 const char *fx_fg_query(void);                  /* requête courante */
 
 /* Résout une URL (page jeu ou paste ou ff directe) → liste de fichiers */

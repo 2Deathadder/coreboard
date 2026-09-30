@@ -100,4 +100,50 @@ int fx_epic_list(EpicLibEntry *out, int max);
 gboolean fx_epic_ready(void);
 void fx_epic_download(const char *appname, const char *title);   /* nécessite d'être connecté */
 EpicStatus fx_epic_status(void);
+
+/* ---- FitGirl Repacks : recherche et téléchargement direct via Fistgirl (fistgirl_helper.py)
+        Moteur : paste.fitgirl-repacks.site → déchiffrement PrivateBin → fuckingfast.co CDN
+        Entièrement natif, sans FDM, avec reprise de téléchargement. */
+
+#define MAXFG_RESULTS 20    /* résultats de recherche */
+#define MAXFG_FILES   100   /* parties d'un même repack */
+
+typedef struct {
+    char title[128];      /* titre du repack */
+    char page_url[256];   /* URL de la page fitgirl-repacks.site */
+} FgSearchHit;
+
+typedef struct {
+    int  file_count;                 /* nombre total de parties */
+    int  file_done;                  /* parties téléchargées */
+    int  file_current;               /* indice de la partie en cours (0-based) */
+    char file_name[80];              /* nom du fichier en cours */
+    char game[128];                  /* titre du jeu */
+    char dest[256];                  /* dossier de destination */
+    double pct;                      /* progression de la partie courante (0-100) */
+    double speed_bps;                /* débit en octets/s */
+    gint64 game_done, game_total;    /* octets jeu entier */
+    gboolean active;                 /* téléchargement en cours */
+    gboolean completed;              /* jeu complet téléchargé */
+    gboolean error;
+    char msg[200];
+} FgDlStatus;
+
+/* Recherche de repacks dans le catalogue FitGirl */
+void     fx_fg_search(const char *query);      /* lance en tâche de fond */
+int      fx_fg_results(FgSearchHit *out, int max);
+const char *fx_fg_query(void);                  /* requête courante */
+
+/* Résout une URL (page jeu ou paste ou ff directe) → liste de fichiers */
+void     fx_fg_resolve(const char *url);        /* lance en tâche de fond */
+gboolean fx_fg_resolved(void);                  /* TRUE une fois la résolution terminée */
+int      fx_fg_file_count(void);
+const char *fx_fg_game_title(void);
+
+/* Téléchargement FitGirl */
+void     fx_fg_download(const char *dest_dir);  /* démarre le téléchargement dans dest_dir */
+void     fx_fg_cancel(void);                     /* annule et supprime les fichiers temporaires */
+FgDlStatus fx_fg_dl_status(void);
+
 #endif
+

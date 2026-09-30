@@ -28,12 +28,15 @@ install: coreboard
 	-install -Dm644 data/devices/*.png -t $(PREFIX)/share/coreboard/devices
 	install -Dm755 data/coreboard-fand $(PREFIX)/share/coreboard/coreboard-fand
 	install -Dm644 data/sounds/startup.ogg $(PREFIX)/share/coreboard/sounds/startup.ogg
+	install -Dm755 data/fistgirl_helper.py $(PREFIX)/share/coreboard/fistgirl_helper.py
+	-install -Dm755 fistgirl/add-on/get_ff_link.py $(PREFIX)/share/coreboard/get_ff_link.py
 	install -Dm644 icon.svg $(PREFIX)/share/icons/hicolor/scalable/apps/coreboard.svg
 	install -Dm644 data/coreboard.desktop $(PREFIX)/share/applications/coreboard.desktop
 	sed -i 's|^Exec=.*|Exec=$(PREFIX)/bin/coreboard|' $(PREFIX)/share/applications/coreboard.desktop
 	-update-desktop-database $(PREFIX)/share/applications 2>/dev/null
 	-gtk-update-icon-cache -q -t $(PREFIX)/share/icons/hicolor 2>/dev/null
 	@echo "Coreboard installé dans $(PREFIX) (bin/coreboard). Vérifie que $(PREFIX)/bin est dans ton PATH."
+
 
 uninstall:
 	rm -rf $(PREFIX)/share/coreboard/fonts $(PREFIX)/share/coreboard/devices $(PREFIX)/share/coreboard/sounds $(PREFIX)/bin/coreboard $(PREFIX)/share/applications/coreboard.desktop $(PREFIX)/share/icons/hicolor/scalable/apps/coreboard.svg

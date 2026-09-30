@@ -1675,7 +1675,7 @@ static void page_gv(cairo_t *cr) {
 static int mx_bind_idx = -1;            /* macro dont on capture le raccourci */
 static int mx_open_idx = -1;            /* macro dont on affiche les étapes */
 
-static int ask_kind;                     /* 0 = nom de macro, 1 = arguments d'un jeu Windows, 2 = nom d'un jeu Windows, 3 = recherche Steam, 4 = code Steam Guard, 5 = code Epic */
+static int ask_kind;                     /* 0 = nom de macro, 1 = arguments d'un jeu Windows, 2 = nom d'un jeu Windows, 3 = recherche Steam, 4 = code Steam Guard, 5 = code Epic, 6 = recherche FitGirl */
 
 static void ask_name_done(GtkEntry *e, gpointer d) {
     int i = GPOINTER_TO_INT(d);
@@ -1684,10 +1684,12 @@ static void ask_name_done(GtkEntry *e, gpointer d) {
     else if (ask_kind == 3) { if (*t) fx_steamsearch_query(t); }
     else if (ask_kind == 4) { if (*t) fx_steam_guard_code(t); }
     else if (ask_kind == 5) { if (*t) fx_epic_login(t); }
+    else if (ask_kind == 6) { if (*t) fx_fg_search(t); }
     else { int n; WinGame *w = wg_list(&n); if (i >= 0 && i < n) { g_strlcpy(ask_kind == 1 ? w[i].args : w[i].name, t, ask_kind == 1 ? sizeof w[i].args : sizeof w[i].name); wg_save(); } }
     gtk_window_destroy(GTK_WINDOW(gtk_widget_get_root(GTK_WIDGET(e))));
     if (area) gtk_widget_queue_draw(area);
 }
+
 
 /* petite fenêtre de saisie (l'interface dessinée n'a pas de champ texte) */
 static void ask_text(int kind, int i, const char *title, const char *initial) {
@@ -2025,10 +2027,118 @@ static void nav_item(cairo_t *cr, double y, int pg, const char *t, int ic) {
 }
 static void nav_section(cairo_t *cr, double y, const char *t) { text(cr, t, 16, y + 13, 11.5, 400, F_SANS, 0x808086, 1, 0, 0); }
 
+/* ------------------------------------------------------------------ Page FitGirl Repacks */
+static void page_fitgirl(cairo_t *cr) {
+    ptitle(cr, "FitGirl Repacks");
+    text(cr, "Recherche et téléchargement de repacks FitGirl directement depuis Coreboard.", X0, 82, 12.5, 400, F_SANS, C_MUTE, 1, 0, 0);
+
+    double cy = VY0 + 20;
+
+    /* ---- Barre de recherche ---- */
+    section(cr, "Rechercher un repack", X0, cy);
+    const char *q = fx_fg_query();
+    char qbuf[160];
+    g_snprintf(qbuf, sizeof qbuf, *q ? "Résultats pour « %s »" : "Aucune recherche lancée", q);
+    text(cr, qbuf, X0, cy + 24, 12.5, 400, F_SANS, C_MUTE, 1, 0, 0);
+    if (outline_btn(cr, XR - 180, cy - 5, 180, 26, "Nouvelle recherche…", 12))
+        ask_text(6, 0, "Rechercher un repack FitGirl", q);
+    cy += 44;
+
+    /* ---- Résultats ---- */
+    FgSearchHit hits[MAXFG_RESULTS];
+    int nhits = fx_fg_results(hits, MAXFG_RESULTS);
+    if (nhits == 0 && *q) {
+        text(cr, "Recherche en cours…", X0, cy + 14, 12.5, 400, F_SANS, C_MUTE, 1, 0, 0);
+        schedule_redraw(500);
+        cy += 40;
+    } else if (nhits > 0) {
+        double gap = 12;
+        int cols = grid_cols(CW, 260, gap);
+        double cw = (CW - (cols - 1) * gap) / cols;
+        for (int i = 0; i < nhits; i++) {
+            double x = X0 + (i % cols) * (cw + gap);
+            double ry = cy + (i / cols) * (98 + gap);
+            panel(cr, x, ry, cw, 98, FALSE);
+            text_fit(cr, hits[i].title, x + 14, ry + 28, 13.5, 600, F_SANS, C_TEXT, cw - 28, 0);
+            if (outline_btn(cr, x + 14, ry + 50, cw - 28, 28, "Sélectionner", 12)) {
+                fx_fg_resolve(hits[i].page_url);
+                char b[192]; g_snprintf(b, sizeof b, "Résolution de « %s »…", hits[i].title);
+                show_toast(b);
+            }
+        }
+        cy += ((nhits + cols - 1) / cols) * (98 + gap) + 12;
+    }
+
+    /* ---- Jeu sélectionné (résolution en cours ou terminée) ---- */
+    cy += 10;
+    section(cr, "Jeu sélectionné", X0, cy);
+    cy += 26;
+    gboolean resolved = fx_fg_resolved();
+    const char *gtitle = fx_fg_game_title();
+    int nfiles = fx_fg_file_count();
+    if (!resolved && !*gtitle) {
+        text(cr, "Sélectionne un jeu dans les résultats ci-dessus.", X0, cy + 14, 12.5, 400, F_SANS, C_MUTE, 1, 0, 0);
+        cy += 40;
+    } else if (!resolved) {
+        text(cr, "Résolution des liens en cours…", X0, cy + 14, 12.5, 400, F_SANS, C_MUTE, 1, 0, 0);
+        schedule_redraw(500);
+        cy += 40;
+    } else {
+        char gb[200];
+        g_snprintf(gb, sizeof gb, "%s — %d partie(s)", *gtitle ? gtitle : "(titre inconnu)", nfiles);
+        text(cr, gb, X0, cy + 14, 13.5, 600, F_SANS, C_TEXT, 1, 0, 0);
+        cy += 36;
+
+        /* Destination par défaut */
+        static char fg_dest[512];
+        if (!fg_dest[0]) g_snprintf(fg_dest, sizeof fg_dest, "%s/Games/FitGirl", g_get_home_dir());
+
+        FgDlStatus st = fx_fg_dl_status();
+        if (!st.active && !st.completed) {
+            if (outline_btn(cr, X0, cy, 200, 30, "Télécharger ici →  ~/Games/FitGirl", 12))
+                fx_fg_download(fg_dest);
+            cy += 44;
+        } else if (st.active) {
+            /* Barre de progression partie courante */
+            char pb[200];
+            g_snprintf(pb, sizeof pb, "Partie %d/%d — %s", st.file_done + 1, st.file_count, st.msg);
+            text_fit(cr, pb, X0, cy + 14, 12.5, 400, F_SANS, C_TEXT, CW, 0);
+            cy += 28;
+            cairo_rectangle(cr, X0, cy, CW, 6); rgba(cr, 0x1e1e22, 1); cairo_fill(cr);
+            cairo_rectangle(cr, X0, cy, CW * CLAMP(st.pct, 0, 100) / 100.0, 6); rgba(cr, C_RED, 1); cairo_fill(cr);
+            cy += 16;
+            /* Progression globale si connue */
+            if (st.game_total > 0) {
+                double gpct = (double)st.game_done / st.game_total * 100.0;
+                char gb2[80]; g_snprintf(gb2, sizeof gb2, "Total : %.1f %%", gpct);
+                text(cr, gb2, X0, cy + 14, 12, 400, F_SANS, C_MUTE, 1, 0, 0);
+                cy += 28;
+            }
+            if (outline_btn(cr, X0, cy, 100, 28, "Annuler", 12)) fx_fg_cancel();
+            cy += 44;
+            schedule_redraw(500);
+        } else if (st.completed) {
+            char dm[256]; g_snprintf(dm, sizeof dm, "✓ %s", st.msg);
+            text(cr, dm, X0, cy + 14, 13, 500, F_SANS, C_OK, 1, 0, 0);
+            if (outline_btn(cr, X0 + 200, cy, 160, 28, "Ouvrir le dossier", 12))
+                open_path(st.dest);
+            cy += 44;
+        } else if (st.error) {
+            text_fit(cr, st.msg, X0, cy + 14, 12.5, 400, F_SANS, C_RED, CW, 0);
+            if (outline_btn(cr, X0, cy + 32, 140, 28, "Réessayer", 12))
+                fx_fg_download(fg_dest);
+            cy += 74;
+        }
+    }
+
+    page_h = cy + 24;
+}
+
 static void chrome(cairo_t *cr) {
     /* barre latérale */
     cairo_rectangle(cr, 0, VY0, SBW, LHv); rgba(cr, 0x0a0a0c, 0.6); cairo_fill(cr);
     nav_item(cr, 46, 0, "Accueil", 0);
+
     nav_item(cr, 80, 6, "Appareils", 8);
     nav_section(cr, 122, "Contrôle");
     nav_item(cr, 148, 1, "Performances", 1);
@@ -2042,8 +2152,10 @@ static void chrome(cairo_t *cr) {
     nav_item(cr, 420, 8, "Jeux", 13);
     nav_item(cr, 454, 11, "Macros", 16);
     nav_item(cr, 488, 12, "Jeux Windows", 2);
-    nav_section(cr, 530, "Surveillance");
-    nav_item(cr, 556, 4, "Système", 4);
+    nav_item(cr, 522, 13, "FitGirl Repacks", 8);
+    nav_section(cr, 564, "Surveillance");
+    nav_item(cr, 590, 4, "Système", 4);
+
     nav_item(cr, VY0 + LHv - 52, 5, "Réglages", 5);
 
     /* raccourcis en haut à droite du contenu (Système, Audio, Réglages) */
@@ -2102,7 +2214,7 @@ static void draw(GtkDrawingArea *a, cairo_t *cr, int w, int h, gpointer d) {
     if (hw.uptime <= 0) utext(cr, "Chargement…", LWv / 2, VY0 + LHv / 2, 20, 600, F_SANS, C_MUTE, 1, 4);
     else switch (page) { case 0: page_home(cr); break; case 1: page_perf(cr); break; case 2: page_display(cr); break;
                     case 3: page_audio(cr); break; case 4: page_system(cr); break; case 5: page_about(cr); break;
-                    case 6: page_devices(cr); break; case 7: page_scenarios(cr); break; case 9: page_rgb(cr); break; case 10: page_gv(cr); break; case 11: page_macros(cr); break; case 12: page_windows(cr); break; default: page_games(cr); }
+                    case 6: page_devices(cr); break; case 7: page_scenarios(cr); break; case 9: page_rgb(cr); break; case 10: page_gv(cr); break; case 11: page_macros(cr); break; case 12: page_windows(cr); break; case 13: page_fitgirl(cr); break; default: page_games(cr); }
     cairo_restore(cr);
     my = my_saved;
     chrome(cr);

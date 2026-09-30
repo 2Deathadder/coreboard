@@ -5,8 +5,10 @@
 #include <stdio.h>
 #include <stdarg.h>
 #include <string.h>
+#include <glib/gstdio.h>
 #include "hw.h"
 #include "fanctl.h"
+
 
 /* ------------------------------------------------------------------ utilitaires */
 static gchar *run_out(const char *const *argv) {
@@ -1149,3 +1151,278 @@ void fx_gog_download(const GogLibEntry *g) {
 }
 
 void fx_init(void) { sc_load(); fx_games_rescan(); }
+
+/* ------------------------------------------------------------------ FitGirl Repacks : Fistgirl
+   fistgirl_helper.py gère : recherche sur fitgirl-repacks.site, déchiffrement PrivateBin,
+   résolution des liens fuckingfast.co (contournement DNS via DoH Cloudflare),
+   et téléchargement reprenable multi-parties. Les sorties JSON sont parsées ligne par ligne. */
+
+/* Chemin de fistgirl_helper.py : d'abord dans DATADIR (installation), puis à côté de l'exécutable */
+static const char *fg_helper_path(void) {
+    static char buf[512];
+    if (!buf[0]) {
+        /* 1. DATADIR/fistgirl_helper.py (après make install) */
+        g_snprintf(buf, sizeof buf, "%s/fistgirl_helper.py", DATADIR);
+        if (g_file_test(buf, G_FILE_TEST_IS_REGULAR)) return buf;
+        /* 2. Répertoire du binaire en cours (développement) */
+        gchar *exe = g_file_read_link("/proc/self/exe", NULL);
+        if (exe) {
+            gchar *dir = g_path_get_dirname(exe); g_free(exe);
+            g_snprintf(buf, sizeof buf, "%s/../data/fistgirl_helper.py", dir); g_free(dir);
+            if (g_file_test(buf, G_FILE_TEST_IS_REGULAR)) return buf;
+            /* 3. data/ dans le répertoire de travail */
+            g_strlcpy(buf, "data/fistgirl_helper.py", sizeof buf);
+        }
+    }
+    return buf;
+}
+
+/* Exécute fistgirl_helper.py et renvoie stdout (ou NULL en cas d'erreur) */
+static gchar *fg_run(const char *const *args) {
+    const char *helper = fg_helper_path();
+    int argc = 0; while (args[argc]) argc++;
+    /* Construit argv: python3 helper arg1 arg2 ... */
+    const char **argv = g_new0(const char *, argc + 3);
+    argv[0] = "python3"; argv[1] = helper;
+    for (int i = 0; i < argc; i++) argv[i + 2] = args[i];
+    gchar *out = NULL; gint st = 0;
+    g_spawn_sync(NULL, (char **)argv, NULL, G_SPAWN_SEARCH_PATH | G_SPAWN_STDERR_TO_DEV_NULL,
+                 NULL, NULL, &out, NULL, &st, NULL);
+    g_free(argv);
+    if (st || !out || !*out) { g_free(out); return NULL; }
+    return out;
+}
+
+/* ---- Recherche ---- */
+static GMutex fg_search_lock;
+static FgSearchHit fg_results_cache[MAXFG_RESULTS];
+static int fg_nresults;
+static char fg_query_str[128];
+static gboolean fg_search_busy;
+
+typedef struct { char query[128]; } FgSearchArg;
+
+static gpointer fg_search_thread(gpointer d) {
+    FgSearchArg *a = d;
+    const char *args[] = {"search", a->query, NULL};
+    gchar *out = fg_run(args);
+    g_free(a);
+    FgSearchHit tmp[MAXFG_RESULTS]; int n = 0;
+    if (out) {
+        JsonParser *jp = json_parser_new();
+        if (json_parser_load_from_data(jp, out, -1, NULL)) {
+            JsonNode *root = json_parser_get_root(jp);
+            if (JSON_NODE_HOLDS_ARRAY(root)) {
+                JsonArray *arr = json_node_get_array(root);
+                for (guint i = 0; i < json_array_get_length(arr) && n < MAXFG_RESULTS; i++) {
+                    JsonObject *o = json_array_get_object_element(arr, i);
+                    const char *t = jstr(o, "title"), *u = jstr(o, "page_url");
+                    if (!*t || !*u) continue;
+                    g_strlcpy(tmp[n].title, t, sizeof tmp[n].title);
+                    g_strlcpy(tmp[n].page_url, u, sizeof tmp[n].page_url);
+                    n++;
+                }
+            }
+        }
+        g_object_unref(jp); g_free(out);
+    }
+    g_mutex_lock(&fg_search_lock);
+    memcpy(fg_results_cache, tmp, n * sizeof(FgSearchHit)); fg_nresults = n; fg_search_busy = FALSE;
+    g_mutex_unlock(&fg_search_lock);
+    return NULL;
+}
+
+void fx_fg_search(const char *query) {
+    g_mutex_lock(&fg_search_lock);
+    gboolean go = !fg_search_busy; fg_search_busy = TRUE;
+    g_strlcpy(fg_query_str, query, sizeof fg_query_str);
+    fg_nresults = 0;
+    g_mutex_unlock(&fg_search_lock);
+    if (!go) return;
+    FgSearchArg *a = g_new0(FgSearchArg, 1);
+    g_strlcpy(a->query, query, sizeof a->query);
+    g_thread_unref(g_thread_new("coreboard-fg-search", fg_search_thread, a));
+}
+
+int fx_fg_results(FgSearchHit *out, int max) {
+    g_mutex_lock(&fg_search_lock);
+    int n = MIN(fg_nresults, max);
+    memcpy(out, fg_results_cache, n * sizeof(FgSearchHit));
+    g_mutex_unlock(&fg_search_lock);
+    return n;
+}
+
+const char *fx_fg_query(void) { return fg_query_str; }
+
+/* ---- Résolution d'URL → liste de fichiers ---- */
+static GMutex fg_resolve_lock;
+static gboolean fg_resolved, fg_resolve_busy, fg_resolve_error;
+static char fg_game_title[128];
+static char fg_resolved_json[8192]; /* JSON complet du job */
+static int fg_file_count_cache;
+
+typedef struct { char url[512]; } FgResolveArg;
+
+static gpointer fg_resolve_thread(gpointer d) {
+    FgResolveArg *a = d;
+    const char *args[] = {"resolve", a->url, NULL};
+    gchar *out = fg_run(args);
+    g_free(a);
+    gboolean ok = FALSE; char title[128] = ""; int nf = 0; char jbuf[8192] = "";
+    if (out) {
+        JsonParser *jp = json_parser_new();
+        if (json_parser_load_from_data(jp, out, -1, NULL)) {
+            JsonNode *root = json_parser_get_root(jp);
+            if (JSON_NODE_HOLDS_OBJECT(root)) {
+                JsonObject *o = json_node_get_object(root);
+                const char *t = jstr(o, "title");
+                if (*t) { g_strlcpy(title, t, sizeof title); ok = TRUE; }
+                nf = json_object_has_member(o, "file_count") ? (int)json_object_get_int_member(o, "file_count") : 0;
+                g_strlcpy(jbuf, out, sizeof jbuf - 1);
+            }
+        }
+        g_object_unref(jp); g_free(out);
+    }
+    g_mutex_lock(&fg_resolve_lock);
+    fg_resolved = TRUE; fg_resolve_error = !ok; fg_resolve_busy = FALSE;
+    if (ok) {
+        g_strlcpy(fg_game_title, title, sizeof fg_game_title);
+        g_strlcpy(fg_resolved_json, jbuf, sizeof fg_resolved_json);
+        fg_file_count_cache = nf;
+    }
+    g_mutex_unlock(&fg_resolve_lock);
+    return NULL;
+}
+
+void fx_fg_resolve(const char *url) {
+    g_mutex_lock(&fg_resolve_lock);
+    fg_resolved = FALSE; fg_resolve_error = FALSE; fg_resolve_busy = TRUE;
+    fg_game_title[0] = '\0'; fg_file_count_cache = 0;
+    g_mutex_unlock(&fg_resolve_lock);
+    FgResolveArg *a = g_new0(FgResolveArg, 1);
+    g_strlcpy(a->url, url, sizeof a->url);
+    g_thread_unref(g_thread_new("coreboard-fg-resolve", fg_resolve_thread, a));
+}
+
+gboolean fx_fg_resolved(void) { g_mutex_lock(&fg_resolve_lock); gboolean r = fg_resolved; g_mutex_unlock(&fg_resolve_lock); return r; }
+int      fx_fg_file_count(void) { g_mutex_lock(&fg_resolve_lock); int n = fg_file_count_cache; g_mutex_unlock(&fg_resolve_lock); return n; }
+const char *fx_fg_game_title(void) { return fg_game_title; }
+
+/* ---- Téléchargement ---- */
+static GMutex fg_dl_lock;
+static FgDlStatus fg_dl;
+
+
+FgDlStatus fx_fg_dl_status(void) {
+    g_mutex_lock(&fg_dl_lock); FgDlStatus s = fg_dl; g_mutex_unlock(&fg_dl_lock); return s;
+}
+
+/* Parse une ligne JSON émise par fistgirl_helper.py download et met à jour fg_dl */
+static void fg_parse_event(const char *line) {
+    if (!line || !*line || *line != '{') return;
+    JsonParser *jp = json_parser_new();
+    if (!json_parser_load_from_data(jp, line, -1, NULL)) { g_object_unref(jp); return; }
+    JsonObject *o = json_node_get_object(json_parser_get_root(jp));
+    const char *ev = jstr(o, "event");
+    g_mutex_lock(&fg_dl_lock);
+    if (!g_strcmp0(ev, "job_start")) {
+        g_strlcpy(fg_dl.game, jstr(o, "title"), sizeof fg_dl.game);
+        g_strlcpy(fg_dl.dest, jstr(o, "dest"), sizeof fg_dl.dest);
+        fg_dl.file_count = json_object_has_member(o, "file_count") ? (int)json_object_get_int_member(o, "file_count") : 0;
+        fg_dl.file_done = 0; fg_dl.active = TRUE; fg_dl.completed = FALSE; fg_dl.error = FALSE;
+        g_strlcpy(fg_dl.msg, "Démarrage…", sizeof fg_dl.msg);
+    } else if (!g_strcmp0(ev, "file_start") || !g_strcmp0(ev, "resolving_link")) {
+        g_strlcpy(fg_dl.file_name, jstr(o, "file"), sizeof fg_dl.file_name);
+        fg_dl.file_current = json_object_has_member(o, "file_index") ? (int)json_object_get_int_member(o, "file_index") : fg_dl.file_current;
+        fg_dl.pct = 0;
+        g_snprintf(fg_dl.msg, sizeof fg_dl.msg, "%s…", !g_strcmp0(ev, "resolving_link") ? "Résolution du lien" : "Téléchargement");
+    } else if (!g_strcmp0(ev, "progress")) {
+        fg_dl.pct = json_object_has_member(o, "pct") ? json_object_get_double_member(o, "pct") : fg_dl.pct;
+        fg_dl.speed_bps = json_object_has_member(o, "speed_bps") ? json_object_get_double_member(o, "speed_bps") : 0;
+        fg_dl.game_done = json_object_has_member(o, "game_done") ? json_object_get_int_member(o, "game_done") : fg_dl.game_done;
+        fg_dl.game_total = json_object_has_member(o, "game_total") ? json_object_get_int_member(o, "game_total") : fg_dl.game_total;
+        g_strlcpy(fg_dl.file_name, jstr(o, "file"), sizeof fg_dl.file_name);
+        double sp = fg_dl.speed_bps;
+        if (sp > 1024*1024) g_snprintf(fg_dl.msg, sizeof fg_dl.msg, "%.1f Mo/s — %s", sp/1024/1024, fg_dl.file_name);
+        else g_snprintf(fg_dl.msg, sizeof fg_dl.msg, "%.0f Ko/s — %s", sp/1024, fg_dl.file_name);
+    } else if (!g_strcmp0(ev, "file_done") || !g_strcmp0(ev, "file_cached")) {
+        fg_dl.file_done++;
+        fg_dl.pct = 100;
+    } else if (!g_strcmp0(ev, "job_completed")) {
+        fg_dl.active = FALSE; fg_dl.completed = TRUE;
+        g_snprintf(fg_dl.msg, sizeof fg_dl.msg, "Téléchargement terminé : %s", fg_dl.game);
+    } else if (json_object_has_member(o, "error")) {
+        fg_dl.active = FALSE; fg_dl.error = TRUE;
+        g_strlcpy(fg_dl.msg, jstr(o, "error"), sizeof fg_dl.msg);
+    }
+    g_mutex_unlock(&fg_dl_lock);
+    g_object_unref(jp);
+}
+
+typedef struct { char job_json[8192]; char dest[512]; } FgDlArg;
+
+static gpointer fg_dl_thread(gpointer d) {
+    FgDlArg *a = d;
+
+    /* Écrit le JSON du job dans un fichier temporaire */
+    gchar *tmp = g_build_filename(g_get_tmp_dir(), "coreboard_fg_job.json", NULL);
+    g_file_set_contents(tmp, a->job_json, -1, NULL);
+
+    const char *args[] = {"download", tmp, a->dest, NULL};
+    const char *helper = fg_helper_path();
+    const char *argv[] = {"python3", helper, args[0], args[1], args[2], NULL};
+    g_free(a);
+
+    GSubprocess *proc = g_subprocess_newv(argv, G_SUBPROCESS_FLAGS_STDOUT_PIPE | G_SUBPROCESS_FLAGS_STDERR_SILENCE, NULL);
+    if (!proc) {
+        g_mutex_lock(&fg_dl_lock); fg_dl.active = FALSE; fg_dl.error = TRUE; g_strlcpy(fg_dl.msg, "Impossible de lancer fistgirl_helper.py", sizeof fg_dl.msg); g_mutex_unlock(&fg_dl_lock);
+        g_free(tmp); return NULL;
+    }
+
+    GInputStream *out_stream = g_subprocess_get_stdout_pipe(proc);
+    GDataInputStream *dat = g_data_input_stream_new(out_stream);
+    gsize len; GError *err = NULL; char *line;
+    while ((line = g_data_input_stream_read_line(dat, &len, NULL, &err)) != NULL) {
+        fg_parse_event(line);
+        g_free(line);
+    }
+    g_object_unref(dat);
+    g_subprocess_wait(proc, NULL, NULL);
+    g_object_unref(proc);
+    g_unlink(tmp); g_free(tmp);
+    /* Si le processus s'est terminé sans job_completed, marquer comme erreur */
+    g_mutex_lock(&fg_dl_lock);
+    if (fg_dl.active) { fg_dl.active = FALSE; fg_dl.error = TRUE; g_strlcpy(fg_dl.msg, "Téléchargement interrompu", sizeof fg_dl.msg); }
+    g_mutex_unlock(&fg_dl_lock);
+    return NULL;
+}
+
+void fx_fg_download(const char *dest_dir) {
+    g_mutex_lock(&fg_resolve_lock);
+    char jbuf[8192]; g_strlcpy(jbuf, fg_resolved_json, sizeof jbuf);
+    g_mutex_unlock(&fg_resolve_lock);
+    if (!jbuf[0]) return;
+
+    g_mutex_lock(&fg_dl_lock);
+    if (fg_dl.active) { g_mutex_unlock(&fg_dl_lock); return; } /* déjà en cours */
+    memset(&fg_dl, 0, sizeof fg_dl);
+    fg_dl.active = TRUE;
+    g_strlcpy(fg_dl.msg, "Initialisation…", sizeof fg_dl.msg);
+    g_mutex_unlock(&fg_dl_lock);
+
+    FgDlArg *a = g_new0(FgDlArg, 1);
+    g_strlcpy(a->job_json, jbuf, sizeof a->job_json);
+    g_strlcpy(a->dest, dest_dir, sizeof a->dest);
+    g_thread_unref(g_thread_new("coreboard-fg-dl", fg_dl_thread, a));
+}
+
+void fx_fg_cancel(void) {
+    g_mutex_lock(&fg_dl_lock);
+    if (fg_dl.active) {
+        fg_dl.active = FALSE;
+        g_strlcpy(fg_dl.msg, "Annulé", sizeof fg_dl.msg);
+    }
+    g_mutex_unlock(&fg_dl_lock);
+    /* Note : le thread python finira proprement au prochain cycle de lecture */
+}
+

@@ -1157,25 +1157,33 @@ void fx_init(void) { sc_load(); fx_games_rescan(); }
    résolution des liens fuckingfast.co (contournement DNS via DoH Cloudflare),
    et téléchargement reprenable multi-parties. Les sorties JSON sont parsées ligne par ligne. */
 
-/* Chemin de fistgirl_helper.py : d'abord dans DATADIR (installation), puis à côté de l'exécutable */
+/* Chemin de fistgirl_helper.py : DATADIR (install), puis exe_dir/data/ (dev), puis CWD/data/ */
 static const char *fg_helper_path(void) {
     static char buf[512];
-    if (!buf[0]) {
-        /* 1. DATADIR/fistgirl_helper.py (après make install) */
-        g_snprintf(buf, sizeof buf, "%s/fistgirl_helper.py", DATADIR);
-        if (g_file_test(buf, G_FILE_TEST_IS_REGULAR)) return buf;
-        /* 2. Répertoire du binaire en cours (développement) */
-        gchar *exe = g_file_read_link("/proc/self/exe", NULL);
-        if (exe) {
-            gchar *dir = g_path_get_dirname(exe); g_free(exe);
-            g_snprintf(buf, sizeof buf, "%s/../data/fistgirl_helper.py", dir); g_free(dir);
-            if (g_file_test(buf, G_FILE_TEST_IS_REGULAR)) return buf;
-            /* 3. data/ dans le répertoire de travail */
-            g_strlcpy(buf, "data/fistgirl_helper.py", sizeof buf);
-        }
+    if (buf[0]) return buf;   /* déjà résolu */
+
+    /* 1. DATADIR (après make install : ~/.local/share/coreboard/) */
+    g_snprintf(buf, sizeof buf, "%s/fistgirl_helper.py", DATADIR);
+    if (g_file_test(buf, G_FILE_TEST_IS_REGULAR)) return buf;
+
+    /* 2. À partir du chemin du binaire en cours */
+    gchar *exe = g_file_read_link("/proc/self/exe", NULL);
+    if (exe) {
+        gchar *dir = g_path_get_dirname(exe); g_free(exe);
+        /* 2a. dev : binaire à la racine du projet (./coreboard), data/ juste à côté */
+        g_snprintf(buf, sizeof buf, "%s/data/fistgirl_helper.py", dir);
+        if (g_file_test(buf, G_FILE_TEST_IS_REGULAR)) { g_free(dir); return buf; }
+        /* 2b. installé : binaire dans PREFIX/bin/, data dans PREFIX/share/coreboard/ */
+        g_snprintf(buf, sizeof buf, "%s/../share/coreboard/fistgirl_helper.py", dir);
+        if (g_file_test(buf, G_FILE_TEST_IS_REGULAR)) { g_free(dir); return buf; }
+        g_free(dir);
     }
+
+    /* 3. Chemin relatif depuis le répertoire de travail (dernier recours) */
+    g_strlcpy(buf, "data/fistgirl_helper.py", sizeof buf);
     return buf;
 }
+
 
 /* Exécute fistgirl_helper.py et renvoie stdout (ou NULL en cas d'erreur) */
 static gchar *fg_run(const char *const *args) {

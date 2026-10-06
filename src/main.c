@@ -2457,7 +2457,11 @@ static void page_fitgirl(cairo_t *cr) {
         schedule_redraw(400);
         y += 40;
     } else if (nhits == 0) {
-        text(cr, "Aucun résultat. Essaie un autre terme (titre en anglais).", X0, y + 14, 12.5, 400, F_SANS, C_MUTE, 1, 0, 0);
+        const char *se = fx_fg_search_error();
+        if (*se) {
+            text_fit(cr, se, X0, y + 14, 12.5, 600, F_SANS, C_RED, CW - 140, 0);
+            if (outline_btn(cr, XR - 120, y, 120, 28, "Réessayer", 12)) { gchar *qq = g_strdup(q); fx_fg_search(qq); g_free(qq); }
+        } else text(cr, "Aucun résultat. Essaie un autre terme (titre en anglais).", X0, y + 14, 12.5, 400, F_SANS, C_MUTE, 1, 0, 0);
         y += 40;
     } else {
         double gap = 12, cardh = 96;

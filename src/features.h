@@ -137,7 +137,8 @@ typedef struct {
 void     fx_fg_search(const char *query);      /* lance en tâche de fond */
 int      fx_fg_results(FgSearchHit *out, int max);
 gboolean fx_fg_search_busy(void);               /* TRUE tant que la recherche tourne */
-const char *fx_fg_query(void);                  /* requête courante */
+const char *fx_fg_query(void);
+const char *fx_fg_search_error(void);           /* erreur de la dernière recherche ("" si aucune) */                  /* requête courante */
 
 /* Résout une URL (page jeu ou paste ou ff directe) → liste de fichiers */
 void     fx_fg_resolve(const char *url);        /* lance en tâche de fond */

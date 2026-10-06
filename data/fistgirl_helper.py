@@ -273,15 +273,17 @@ def search_fitgirl(query):
     """
     results = []
     search_url = f"https://fitgirl-repacks.site/?s={urllib.parse.quote_plus(query)}"
-    req = urllib.request.Request(search_url, headers=HEADERS_BROWSER)
-    try:
-        with urllib.request.urlopen(req, timeout=10) as resp:
-            html = resp.read().decode("utf-8", errors="replace")
-    except Exception:
-        feed_url = "https://fitgirl-repacks.site/feed/"
-        req_f = urllib.request.Request(feed_url, headers=HEADERS_BROWSER)
-        with urllib.request.urlopen(req_f, timeout=10) as resp:
-            html = resp.read().decode("utf-8", errors="replace")
+    html, last_err = None, None
+    for attempt in range(2):                       # le site répond souvent en 8 à 15 s
+        try:
+            req = urllib.request.Request(search_url, headers=HEADERS_BROWSER)
+            with urllib.request.urlopen(req, timeout=25) as resp:
+                html = resp.read().decode("utf-8", errors="replace")
+            break
+        except Exception as e:
+            last_err = e
+    if html is None:
+        raise RuntimeError(f"Site FitGirl injoignable ({last_err})")
 
     matches = re.findall(r'<h1 class="entry-title"><a href="(https://fitgirl-repacks\.site/[^"]+)"[^>]*>(.*?)</a></h1>', html)
     for url, raw_title in matches:

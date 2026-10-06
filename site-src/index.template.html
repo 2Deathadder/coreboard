@@ -151,7 +151,7 @@ h3 { font: 500 17px/1.35 var(--sans); letter-spacing: -.01em; margin: 0 0 8px; }
 
 .shot { border: 1px solid var(--border-strong); border-radius: 8px; overflow: hidden; background: #000; box-shadow: 0 30px 80px -30px rgba(255,26,58,.35), 0 0 0 6px rgba(255,255,255,.015); }
 
-.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 1px; background: var(--border); border: 1px solid var(--border); border-radius: 8px; overflow: hidden; margin-top: 40px; }
+.grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1px; background: var(--border); border: 1px solid var(--border); border-radius: 8px; overflow: hidden; margin-top: 40px; }
 .card { background: var(--bg-deep); padding: 26px 24px; transition: background-color .2s; }
 section.deep .card { background: var(--bg); }
 .card:hover { background: var(--panel); }
@@ -165,6 +165,14 @@ section.deep .card { background: var(--bg); }
 .tab[aria-selected="true"] { background: var(--brand); border-color: var(--brand); color: #fff; }
 .gallery figure { margin: 0; }
 .gallery figcaption { margin-top: 14px; font: 13px var(--mono); color: var(--muted); }
+
+/* étapes FitGirl */
+.steps { list-style: none; padding: 0; margin: 28px 0 0; display: grid; gap: 18px; counter-reset: s; }
+.steps li { counter-increment: s; display: grid; grid-template-columns: 34px 1fr; gap: 14px; align-items: start; }
+.steps li::before { content: counter(s, decimal-leading-zero); font: 500 12px var(--mono); color: var(--brand); border: 1px solid var(--border-strong); border-radius: 5px; height: 28px; display: grid; place-items: center; }
+.steps b { display: block; font-weight: 500; color: var(--text); }
+.steps span { color: var(--text-2); font-size: 14px; }
+.legal { margin-top: 26px; padding: 14px 16px; border: 1px solid var(--border-strong); border-left: 3px solid var(--brand); border-radius: 6px; font-size: 13px; color: var(--text-2); background: rgba(255,26,58,.04); }
 
 /* compatibilité */
 .chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 28px; }
@@ -204,6 +212,8 @@ footer a { color: var(--text-2); text-decoration: none; }
 footer a:hover { color: var(--text); }
 footer nav { display: flex; gap: 20px; flex-wrap: wrap; }
 
+@media (max-width: 980px) { .grid { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 600px) { .grid { grid-template-columns: 1fr; } }
 @media (max-width: 860px) {
   .nav-links { display: none; }
   .split { grid-template-columns: 1fr; gap: 36px; }
@@ -223,6 +233,7 @@ footer nav { display: flex; gap: 20px; flex-wrap: wrap; }
     <nav class="nav-links" aria-label="Navigation principale">
       <a href="#fonctionnalites">Fonctionnalités</a>
       <a href="#captures">Captures</a>
+      <a href="#fitgirl">FitGirl</a>
       <a href="#compatibilite">Compatibilité</a>
       <a href="#faq">FAQ</a>
     </nav>
@@ -321,6 +332,11 @@ footer nav { display: flex; gap: 20px; flex-wrap: wrap; }
         <h3>Jeux Windows</h3>
         <p>Proton-GE et umu-launcher, DLSS, ray tracing, GameMode, MangoHud et un diagnostic qui optimise le système.</p>
       </article>
+      <article class="card">
+        <div class="ico"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 3v12m0 0l-5-5m5 5l5-5M4 21h16"/></svg></div>
+        <h3>FitGirl Repacks</h3>
+        <p>Recherche, téléchargement segmenté reprenable, extraction et installation dans Wine. <a href="#fitgirl">En savoir plus</a></p>
+      </article>
     </div>
   </div>
 </section>
@@ -345,7 +361,27 @@ footer nav { display: flex; gap: 20px; flex-wrap: wrap; }
   </div>
 </section>
 
-<section class="block deep" id="compatibilite">
+<section class="block deep" id="fitgirl">
+  <div class="wrap split">
+    <div>
+      <span class="eyebrow">FitGirl Repacks</span>
+      <h2>Du repack au jeu installé, sans quitter Coreboard</h2>
+      <p class="section-lead">Recherche un repack FitGirl, télécharge-le et installe-le dans Wine en quelques clics. Plus besoin de gestionnaire de téléchargement ni de manipulations dans le terminal.</p>
+      <ol class="steps">
+        <li><div><b>Rechercher</b><span>Les résultats du catalogue FitGirl s'affichent directement dans l'application.</span></div></li>
+        <li><div><b>Télécharger</b><span>Huit connexions par fichier, reprise exacte après une coupure, une pause ou un redémarrage. Les fichiers optionnels (voix, bonus) sont ignorés.</span></div></li>
+        <li><div><b>Extraire et installer</b><span>7-Zip extrait les archives, puis l'installateur se lance dans Wine (Proton-GE) avec un préfixe propre au jeu.</span></div></li>
+        <li><div><b>Jouer</b><span>Le jeu rejoint « Jeux Windows » avec DLSS, GameMode et MangoHud. Les archives peuvent ensuite être supprimées pour libérer l'espace.</span></div></li>
+      </ol>
+      <p class="legal">Respecte le droit d'auteur de ton pays&nbsp;: télécharge uniquement des jeux que tu as le droit d'utiliser. Coreboard n'est pas affilié à FitGirl Repacks et n'héberge aucun fichier.</p>
+    </div>
+    <div class="shot">
+      <img src="img/fitgirl.webp" width="1280" height="700" loading="lazy" alt="Page FitGirl Repacks de Coreboard : recherche, jeu sélectionné avec le nombre de parties, bouton Télécharger et choix du dossier">
+    </div>
+  </div>
+</section>
+
+<section class="block" id="compatibilite">
   <div class="wrap">
     <span class="eyebrow">Compatibilité</span>
     <h2>Toutes les distributions, tous les bureaux</h2>
@@ -372,7 +408,7 @@ footer nav { display: flex; gap: 20px; flex-wrap: wrap; }
   </div>
 </section>
 
-<section class="block" id="installation">
+<section class="block deep" id="installation">
   <div class="wrap">
     <span class="eyebrow">Installation</span>
     <h2>Installe Coreboard en deux minutes</h2>
@@ -401,7 +437,7 @@ footer nav { display: flex; gap: 20px; flex-wrap: wrap; }
   </div>
 </section>
 
-<section class="block deep" id="faq">
+<section class="block" id="faq">
   <div class="wrap">
     <span class="eyebrow">Questions fréquentes</span>
     <h2>FAQ</h2>

@@ -1221,6 +1221,7 @@ static char fg_query_str[128];
 static gboolean fg_search_busy;
 static gboolean fg_search_done;   /* TRUE une fois la première recherche terminée */
 static char fg_query_pending[128]; /* requête arrivée pendant une recherche : relancée ensuite */
+static char fg_search_err[200];    /* erreur de la dernière recherche ("" si aucune) */
 
 typedef struct { char query[128]; } FgSearchArg;
 
@@ -1229,11 +1230,13 @@ static gpointer fg_search_thread(gpointer d) {
   again:;
     const char *args[] = {"search", a->query, NULL};
     gchar *out = fg_run(args);
-    FgSearchHit tmp[MAXFG_RESULTS]; int n = 0;
+    FgSearchHit tmp[MAXFG_RESULTS]; int n = 0; char err[200] = "";
+    if (!out) g_strlcpy(err, "Impossible de lancer fistgirl_helper.py", sizeof err);
     if (out) {
         JsonParser *jp = json_parser_new();
         if (json_parser_load_from_data(jp, out, -1, NULL)) {
             JsonNode *root = json_parser_get_root(jp);
+            if (JSON_NODE_HOLDS_OBJECT(root)) g_strlcpy(err, jstr(json_node_get_object(root), "error"), sizeof err);
             if (JSON_NODE_HOLDS_ARRAY(root)) {
                 JsonArray *arr = json_node_get_array(root);
                 for (guint i = 0; i < json_array_get_length(arr) && n < MAXFG_RESULTS; i++) {
@@ -1256,6 +1259,7 @@ static gpointer fg_search_thread(gpointer d) {
     }
     memcpy(fg_results_cache, tmp, n * sizeof(FgSearchHit));
     fg_nresults = n; fg_search_busy = FALSE; fg_search_done = TRUE;
+    g_strlcpy(fg_search_err, err, sizeof fg_search_err);
     g_mutex_unlock(&fg_search_lock);
     g_free(a);
     return NULL;
@@ -1284,6 +1288,12 @@ int fx_fg_results(FgSearchHit *out, int max) {
 
 gboolean fx_fg_search_busy(void) {
     g_mutex_lock(&fg_search_lock); gboolean b = fg_search_busy; g_mutex_unlock(&fg_search_lock); return b;
+}
+
+const char *fx_fg_search_error(void) {               /* thread principal uniquement */
+    static char e[200];
+    g_mutex_lock(&fg_search_lock); g_strlcpy(e, fg_search_err, sizeof e); g_mutex_unlock(&fg_search_lock);
+    return e;
 }
 
 const char *fx_fg_query(void) {                      /* thread principal uniquement */

@@ -20,7 +20,7 @@ cat > docs/sitemap.xml <<XML
     <loc>https://2deathadder.github.io/coreboard/</loc><lastmod>$DATE</lastmod><changefreq>weekly</changefreq><priority>1.0</priority>
     <xhtml:link rel="alternate" hreflang="fr" href="https://2deathadder.github.io/coreboard/"/>
     <xhtml:link rel="alternate" hreflang="en" href="https://2deathadder.github.io/coreboard/en/"/>
-    <image:image><image:loc>https://2deathadder.github.io/coreboard/img/og-image.jpg</image:loc></image:image>
+    <image:image><image:loc>https://2deathadder.github.io/coreboard/img/social-preview.png</image:loc></image:image>
   </url>
   <url>
     <loc>https://2deathadder.github.io/coreboard/en/</loc><lastmod>$DATE</lastmod><changefreq>weekly</changefreq><priority>0.9</priority>

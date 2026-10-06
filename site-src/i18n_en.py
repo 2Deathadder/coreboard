@@ -27,8 +27,7 @@ tr('<meta property="og:url" content="https://2deathadder.github.io/coreboard/">'
 tr('Coreboard — Le centre de contrôle matériel natif pour Linux', 'Coreboard — The native hardware control center for Linux', every=True)
 tr('content="Modes de performance, CPU/GPU, écran, RGB, scénarios, macros et jeux Windows via Proton, dans une seule application native et open source."',
    'content="Performance modes, CPU/GPU, display, RGB, scenarios, macros and Windows games through Proton, in one native open-source app."')
-tr('content="Écran d\'accueil de Coreboard : GPU, CPU, ventilateurs, mémoire et modes de fonctionnement"',
-   'content="Coreboard home screen: GPU, CPU, fans, memory and performance modes"')
+tr('content="Coreboard, le centre de contrôle matériel natif pour Linux"', 'content="Coreboard, the native hardware control center for Linux"')
 tr('content="Une seule application native et open source pour piloter tout ton PC sous Linux."',
    'content="One native, open-source app to control your whole PC on Linux."')
 tr('href="favicon.svg"', 'href="../favicon.svg"')

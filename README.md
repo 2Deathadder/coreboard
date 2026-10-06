@@ -1,10 +1,37 @@
+<p align="center">
+  <a href="https://2deathadder.github.io/coreboard/"><img src="docs/img/banner.png" alt="Coreboard — le centre de contrôle matériel natif pour Linux" width="100%"></a>
+</p>
+
+<p align="center">
+  <a href="https://github.com/2Deathadder/coreboard/releases/latest"><img src="https://img.shields.io/github/v/release/2Deathadder/coreboard?color=e5112f&label=version" alt="Version"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/licence-GPL--3.0-e5112f" alt="Licence GPL-3.0"></a>
+  <img src="https://img.shields.io/badge/Linux-GTK4%20%C2%B7%20C-e5112f" alt="Linux, GTK4, C">
+  <img src="https://img.shields.io/badge/bureaux-Hyprland%20%C2%B7%20GNOME%20%C2%B7%20KDE%20%C2%B7%20Sway-e5112f" alt="Hyprland, GNOME, KDE, Sway">
+</p>
+
+<p align="center">
+  <b><a href="https://2deathadder.github.io/coreboard/">Site officiel</a></b> ·
+  <a href="https://2deathadder.github.io/coreboard/en/">English</a> ·
+  <a href="#installation-arch-et-dérivées">Installation</a> ·
+  <a href="https://github.com/2Deathadder/coreboard/releases">Versions</a>
+</p>
+
 # Coreboard
 
-[![Site officiel](https://img.shields.io/badge/site-2deathadder.github.io%2Fcoreboard-ff1a3a)](https://2deathadder.github.io/coreboard/)
-[![Version](https://img.shields.io/github/v/release/2Deathadder/coreboard?color=ff1a3a)](https://github.com/2Deathadder/coreboard/releases/latest)
-[![Licence](https://img.shields.io/badge/licence-GPL--3.0-ff1a3a)](LICENSE)
+<p align="center">
+  <img src="docs/img/accueil.webp" alt="Accueil de Coreboard : GPU, CPU, ventilateurs, mémoire et modes de fonctionnement" width="100%">
+</p>
 
-**Site officiel : [2deathadder.github.io/coreboard](https://2deathadder.github.io/coreboard/)** · [English](https://2deathadder.github.io/coreboard/en/)
+<table>
+  <tr>
+    <td width="50%"><img src="docs/img/performances.webp" alt="Page Performances"><p align="center"><sub>Performances</sub></p></td>
+    <td width="50%"><img src="docs/img/eclairage.webp" alt="Page Éclairage RGB"><p align="center"><sub>Éclairage RGB</sub></p></td>
+  </tr>
+  <tr>
+    <td width="50%"><img src="docs/img/jeux-windows.webp" alt="Page Jeux Windows"><p align="center"><sub>Jeux Windows (Proton-GE)</sub></p></td>
+    <td width="50%"><img src="docs/img/fitgirl.webp" alt="Page FitGirl Repacks"><p align="center"><sub>FitGirl Repacks</sub></p></td>
+  </tr>
+</table>
 
 Centre de contrôle matériel **natif** pour Linux, écrit en C (GTK4 + Cairo/Pango), au style d'**Armoury Crate** (barre latérale, en-têtes à barres rouges, cartes GPU/CPU/Ventilateurs/Mémoire, modes de fonctionnement)
 (noir / rouge, ratio 16:9 conservé quelle que soit la taille de la fenêtre).

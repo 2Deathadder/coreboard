@@ -1,0 +1,38 @@
+<!doctype html>
+<html><head><meta charset="utf-8">
+<style>
+  html, body { margin: 0; }
+  body { width: 1280px; height: var(--h); background: #070506; overflow: hidden; position: relative; font-family: "JetBrainsMono Nerd Font", "JetBrains Mono", monospace; color: #f4eff0; }
+  canvas { position: absolute; inset: 0; }
+  .mask { position: absolute; inset: 0; background: radial-gradient(ellipse 58% 52% at 50% 50%, #070506 45%, transparent 100%); }
+  .glow { position: absolute; left: 50%; top: 42%; width: 1100px; height: 300px; transform: translate(-50%, -50%); background: radial-gradient(closest-side, rgba(255,26,58,.20), transparent); }
+  .c { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: var(--gap); }
+  img { width: var(--wm); }
+  h1 { margin: 0; font-weight: 500; font-size: var(--fs); letter-spacing: -.01em; }
+  p { margin: 0; color: #b9a9ac; font-size: calc(var(--fs) * .52); }
+  .tags { display: flex; gap: 10px; }
+  .tags span { border: 1px solid #3d272c; border-radius: 999px; padding: 5px 14px; font-size: calc(var(--fs) * .46); color: #c2b3b6; background: rgba(12,8,9,.8); }
+</style></head>
+<body>
+<canvas id="px"></canvas><div class="mask"></div><div class="glow"></div>
+<div class="c">
+  <img src="../docs/img/wordmark.svg" alt="Coreboard">
+  <h1>Le centre de contrôle matériel natif pour Linux</h1>
+  <p>Performances · CPU &amp; GPU · Écran · RGB · Scénarios · Jeux Windows</p>
+  <div class="tags"><span>GTK4 · C</span><span>Hyprland · GNOME · KDE · Sway</span><span>Open source GPL-3.0</span></div>
+</div>
+<script>
+  const q = new URLSearchParams(location.search), H = +(q.get('h') || 640);
+  const r = document.documentElement.style;
+  r.setProperty('--h', H + 'px'); r.setProperty('--wm', (H >= 600 ? 760 : 560) + 'px');
+  r.setProperty('--fs', (H >= 600 ? 34 : 26) + 'px'); r.setProperty('--gap', (H >= 600 ? 26 : 16) + 'px');
+  if (H < 600) document.querySelector('.tags').remove();
+  const cv = document.getElementById('px'), x = cv.getContext('2d'); cv.width = 1280; cv.height = H;
+  const C = ['#3a0a12', '#5c0d1a', '#8a1022', '#c8102e', '#ff1a3a']; let seed = 7;
+  const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;    // aléatoire reproductible
+  for (let y = 0; y < H; y += 18) for (let i = 0; i < 1280; i += 18) {
+    const e = Math.min(i, 1280 - i) / 1280;
+    if (rnd() < 0.02 + Math.pow(0.5 - e, 2) * 0.9) { x.globalAlpha = 0.3 + rnd() * 0.6; x.fillStyle = C[(rnd() * 5) | 0]; x.fillRect(i, y, 12, 12); }
+  }
+</script>
+</body></html>

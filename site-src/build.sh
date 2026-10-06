@@ -2,7 +2,9 @@
 # Génère le site (docs/, publié par GitHub Pages) à partir de site-src/
 set -e
 cd "$(dirname "$0")/.."
-WM=$(python3 site-src/wordmark.py)
+# logo en pixel art : fichier SVG externe (un seul élément pour le navigateur, au lieu de ~600 rectangles dans la page)
+python3 site-src/wordmark.py | sed 's/ class="wordmark"//; s/ role="img" aria-label="Coreboard"//' > docs/img/wordmark.svg
+WM='<img class="wordmark" src="img/wordmark.svg" width="620" height="80" alt="Coreboard" fetchpriority="high">'
 python3 - "$WM" <<'PY'
 import sys
 t = open("site-src/index.template.html").read()

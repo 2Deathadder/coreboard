@@ -1,0 +1,488 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Coreboard — Centre de contrôle matériel pour Linux, alternative à Armoury Crate</title>
+<meta name="description" content="Coreboard est un centre de contrôle matériel natif et gratuit pour Linux : modes de performance, CPU, GPU, écran, éclairage RGB, scénarios par application, macros et jeux Windows via Proton. Open source (GPL-3.0).">
+<meta name="keywords" content="Coreboard, Linux, centre de contrôle, Armoury Crate Linux, alternative Armoury Crate, MSI Center Linux, RGB Linux, Proton-GE, jeux Linux, GTK4, Hyprland, GNOME, KDE">
+<meta name="author" content="windark">
+<meta name="robots" content="index, follow, max-image-preview:large">
+<link rel="canonical" href="https://2deathadder.github.io/coreboard/">
+<link rel="alternate" hreflang="fr" href="https://2deathadder.github.io/coreboard/">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<meta name="theme-color" content="#070506">
+
+<meta property="og:type" content="website">
+<meta property="og:locale" content="fr_FR">
+<meta property="og:site_name" content="Coreboard">
+<meta property="og:title" content="Coreboard — Le centre de contrôle matériel natif pour Linux">
+<meta property="og:description" content="Modes de performance, CPU/GPU, écran, RGB, scénarios, macros et jeux Windows via Proton, dans une seule application native et open source.">
+<meta property="og:url" content="https://2deathadder.github.io/coreboard/">
+<meta property="og:image" content="https://2deathadder.github.io/coreboard/img/og-image.jpg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="Écran d'accueil de Coreboard : GPU, CPU, ventilateurs, mémoire et modes de fonctionnement">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Coreboard — Le centre de contrôle matériel natif pour Linux">
+<meta name="twitter:description" content="Une seule application native et open source pour piloter tout ton PC sous Linux.">
+<meta name="twitter:image" content="https://2deathadder.github.io/coreboard/img/og-image.jpg">
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "SoftwareApplication",
+  "name": "Coreboard",
+  "description": "Centre de contrôle matériel natif pour Linux (GTK4) : modes de performance, CPU, GPU, écran, éclairage RGB, scénarios par application, macros et jeux Windows via Proton-GE.",
+  "applicationCategory": "UtilitiesApplication",
+  "applicationSubCategory": "System utility",
+  "operatingSystem": "Linux",
+  "softwareVersion": "1.0.3",
+  "license": "https://www.gnu.org/licenses/gpl-3.0.html",
+  "url": "https://2deathadder.github.io/coreboard/",
+  "downloadUrl": "https://github.com/2Deathadder/coreboard/releases/latest",
+  "codeRepository": "https://github.com/2Deathadder/coreboard",
+  "screenshot": "https://2deathadder.github.io/coreboard/img/og-image.jpg",
+  "inLanguage": "fr",
+  "isAccessibleForFree": true,
+  "offers": { "@type": "Offer", "price": "0", "priceCurrency": "EUR" },
+  "author": { "@type": "Person", "name": "windark", "url": "https://github.com/2Deathadder" }
+}
+</script>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  "mainEntity": [
+    {"@type": "Question", "name": "Coreboard est-il une alternative à Armoury Crate ou MSI Center sous Linux ?",
+     "acceptedAnswer": {"@type": "Answer", "text": "Oui. Coreboard regroupe dans une seule application native ce que proposent Armoury Crate ou MSI Center sous Windows : modes de performance, réglages du processeur et du GPU, écran, éclairage RGB, scénarios par application et gestion des jeux. Il n'est affilié ni à ASUS ni à MSI."}},
+    {"@type": "Question", "name": "Sur quelles distributions Linux Coreboard fonctionne-t-il ?",
+     "acceptedAnswer": {"@type": "Answer", "text": "Arch Linux et ses dérivées (Omarchy, CachyOS, EndeavourOS, Manjaro), Debian 13 et Ubuntu 24.04 ou plus récents, Fedora 38 ou plus récent et openSUSE Tumbleweed. Il faut GTK 4.10 ou plus récent."}},
+    {"@type": "Question", "name": "Quels bureaux sont pris en charge ?",
+     "acceptedAnswer": {"@type": "Answer", "text": "Hyprland, Sway, KDE Plasma, GNOME et les bureaux X11. Les fonctions s'adaptent : fréquence d'écran via le bureau, filtre lumière bleue natif sous GNOME et KDE, détection des jeux XWayland."}},
+    {"@type": "Question", "name": "Mon PC doit-il être un MSI ou un ASUS ?",
+     "acceptedAnswer": {"@type": "Answer", "text": "Non. Coreboard détecte ce que ton PC expose réellement (processeur Intel, AMD ou ARM, GPU NVIDIA, AMD ou Intel, écran, batterie) et masque ce qui n'existe pas. Seuls l'éclairage du clavier et le refroidissement adaptatif sont propres à certains portables MSI."}},
+    {"@type": "Question", "name": "Coreboard est-il gratuit ?",
+     "acceptedAnswer": {"@type": "Answer", "text": "Oui, Coreboard est un logiciel libre et gratuit sous licence GPL-3.0. Le code source est sur GitHub."}}
+  ]
+}
+</script>
+
+<style>
+:root {
+  --bg: #070506;
+  --bg-deep: #0c0809;
+  --panel: #120c0e;
+  --border: #261a1d;
+  --border-strong: #3d272c;
+  --brand: #ff1a3a;
+  --brand-hover: #ff4560;
+  --brand-dim: #a80b22;
+  --text: #f4eff0;
+  --text-2: #c2b3b6;
+  --muted: #7d6c70;
+  --ok: #2be36f;
+  --mono: "JetBrains Mono", ui-monospace, monospace;
+  --sans: "Geist", system-ui, sans-serif;
+  --nav-h: 56px;
+}
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; scroll-padding-top: calc(var(--nav-h) + 16px); }
+body { margin: 0; background: var(--bg); color: var(--text); font: 15px/1.65 var(--sans); -webkit-font-smoothing: antialiased; overflow-x: hidden; }
+a { color: inherit; }
+img { max-width: 100%; height: auto; display: block; }
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+:focus-visible { outline: 2px solid var(--brand); outline-offset: 3px; }
+.wrap { max-width: 1120px; margin: 0 auto; padding: 0 16px; }
+
+/* navigation */
+header.nav { position: sticky; top: 0; z-index: 20; height: var(--nav-h); background: color-mix(in srgb, var(--bg) 82%, transparent); backdrop-filter: blur(10px); border-bottom: 1px solid var(--border); }
+header.nav .wrap { height: 100%; display: flex; align-items: center; gap: 28px; }
+.brand { display: flex; align-items: center; gap: 10px; text-decoration: none; font: 600 15px var(--mono); letter-spacing: .02em; }
+.brand img { width: 26px; height: 26px; }
+.nav-links { display: flex; gap: 22px; font: 13px var(--mono); }
+.nav-links a { text-decoration: none; color: var(--text-2); transition: color .15s; }
+.nav-links a:hover { color: var(--text); }
+.nav-right { margin-left: auto; display: flex; align-items: center; gap: 14px; }
+.icon-link { display: inline-flex; color: var(--text-2); }
+.icon-link:hover { color: var(--text); }
+
+/* boutons */
+.btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; padding: 9px 18px; border-radius: 6px; font: 500 13.5px var(--mono); text-decoration: none; border: 1px solid transparent; transition: background-color .15s, border-color .15s, transform .1s; cursor: pointer; white-space: nowrap; }
+.btn:active { transform: scale(.97); }
+.btn-primary { background: var(--brand); color: #fff; }
+.btn-primary:hover { background: var(--brand-hover); }
+.btn-ghost { border-color: var(--border-strong); color: var(--text); background: rgba(255,255,255,.02); }
+.btn-ghost:hover { border-color: var(--brand); }
+.btn-sm { padding: 6px 14px; font-size: 12.5px; }
+
+/* héros : champ de pixels */
+.hero { position: relative; min-height: min(calc(100svh - var(--nav-h)), 920px); display: flex; align-items: center; justify-content: center; overflow: hidden; border-bottom: 1px solid var(--border); background: #050304; }
+#pixels { position: absolute; inset: 0; width: 100%; height: 100%; }
+.hero::after { content: ""; position: absolute; inset: 0; background: radial-gradient(ellipse 60% 45% at 50% 50%, #050304 30%, transparent 100%); pointer-events: none; }
+.hero-content { position: relative; z-index: 1; text-align: center; padding: 64px 16px; display: flex; flex-direction: column; align-items: center; }
+.pill { display: inline-flex; align-items: center; gap: 8px; padding: 6px 14px; border: 1px solid var(--border-strong); border-radius: 4px; font: 12px var(--mono); color: var(--text-2); text-decoration: none; background: rgba(12,8,9,.7); transition: border-color .15s, color .15s; }
+.pill:hover { border-color: var(--brand); color: var(--text); }
+.pill b { color: var(--brand); font-weight: 500; }
+.wordmark { width: min(760px, 88vw); height: auto; margin: 40px 0 34px; filter: drop-shadow(0 0 28px rgba(255,26,58,.25)); }
+.hero h1 { margin: 0; font: 500 clamp(22px, 3.2vw, 30px)/1.3 var(--mono); letter-spacing: -.01em; text-wrap: balance; max-width: 760px; }
+.hero p.lead { margin: 16px 0 0; color: var(--text-2); font: 14.5px/1.7 var(--mono); max-width: 640px; text-wrap: balance; }
+.cta { margin-top: 34px; display: flex; gap: 14px; flex-wrap: wrap; justify-content: center; }
+.hero-meta { margin-top: 22px; font: 12px var(--mono); color: var(--muted); }
+
+/* sections */
+section.block { border-top: 1px solid var(--border); padding: 88px 0; }
+section.block.deep { background: var(--bg-deep); }
+.eyebrow { display: inline-flex; align-items: center; gap: 10px; font: 500 12px var(--mono); text-transform: uppercase; letter-spacing: .12em; color: var(--brand); }
+.eyebrow::before { content: ""; width: 22px; height: 10px; background: repeating-linear-gradient(115deg, var(--brand) 0 4px, transparent 4px 7px); }
+h2 { font: 600 clamp(24px, 3vw, 30px)/1.25 var(--sans); letter-spacing: -.02em; margin: 14px 0 12px; text-wrap: balance; }
+h3 { font: 500 17px/1.35 var(--sans); letter-spacing: -.01em; margin: 0 0 8px; }
+.section-lead { color: var(--text-2); max-width: 680px; margin: 0; }
+
+.split { display: grid; grid-template-columns: 1fr 1.35fr; gap: 56px; align-items: center; }
+.points { list-style: none; padding: 0; margin: 26px 0 0; display: grid; gap: 14px; }
+.points li { padding-left: 22px; position: relative; color: var(--text-2); }
+.points li::before { content: ""; position: absolute; left: 0; top: .62em; width: 8px; height: 8px; background: var(--brand); }
+.points b { color: var(--text); font-weight: 500; }
+
+.shot { border: 1px solid var(--border-strong); border-radius: 8px; overflow: hidden; background: #000; box-shadow: 0 30px 80px -30px rgba(255,26,58,.35), 0 0 0 6px rgba(255,255,255,.015); }
+
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 1px; background: var(--border); border: 1px solid var(--border); border-radius: 8px; overflow: hidden; margin-top: 40px; }
+.card { background: var(--bg-deep); padding: 26px 24px; transition: background-color .2s; }
+section.deep .card { background: var(--bg); }
+.card:hover { background: var(--panel); }
+.card .ico { width: 34px; height: 34px; display: grid; place-items: center; border: 1px solid var(--border-strong); border-radius: 6px; color: var(--brand); margin-bottom: 16px; }
+.card p { margin: 0; color: var(--text-2); font-size: 14px; }
+
+/* galerie */
+.tabs { display: flex; gap: 6px; flex-wrap: wrap; margin: 36px 0 18px; }
+.tab { font: 500 12.5px var(--mono); padding: 7px 14px; border: 1px solid var(--border-strong); border-radius: 5px; background: transparent; color: var(--text-2); cursor: pointer; transition: all .15s; }
+.tab:hover { color: var(--text); }
+.tab[aria-selected="true"] { background: var(--brand); border-color: var(--brand); color: #fff; }
+.gallery figure { margin: 0; }
+.gallery figcaption { margin-top: 14px; font: 13px var(--mono); color: var(--muted); }
+
+/* compatibilité */
+.chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 28px; }
+.chip { font: 12.5px var(--mono); padding: 6px 12px; border: 1px solid var(--border-strong); border-radius: 999px; color: var(--text-2); }
+.table-wrap { margin-top: 36px; overflow-x: auto; border: 1px solid var(--border); border-radius: 8px; }
+table { width: 100%; border-collapse: collapse; font-size: 14px; min-width: 640px; }
+th, td { padding: 13px 16px; text-align: left; border-bottom: 1px solid var(--border); }
+thead th { font: 500 12px var(--mono); text-transform: uppercase; letter-spacing: .08em; color: var(--muted); background: var(--bg-deep); }
+tbody tr:last-child td { border-bottom: 0; }
+td.y { color: var(--ok); } td.n { color: var(--muted); }
+tbody th { font-weight: 500; color: var(--text); }
+
+/* installation */
+.install { margin-top: 36px; border: 1px solid var(--border-strong); border-radius: 8px; overflow: hidden; background: #050304; }
+.install .tabs { margin: 0; padding: 10px; border-bottom: 1px solid var(--border); background: var(--bg-deep); }
+.code { position: relative; }
+.code pre { margin: 0; padding: 24px 22px; overflow-x: auto; font: 13.5px/1.75 var(--mono); color: var(--text); }
+.code .c { color: var(--muted); }
+.code .p { color: var(--brand); user-select: none; }
+.copy { position: absolute; top: 12px; right: 12px; }
+.note { margin-top: 18px; color: var(--muted); font-size: 13.5px; }
+.note code, p code, li code { font: 12.5px var(--mono); background: var(--panel); border: 1px solid var(--border); padding: 1px 6px; border-radius: 4px; color: var(--text); }
+
+/* FAQ */
+.faq { margin-top: 36px; border-top: 1px solid var(--border); }
+.faq details { border-bottom: 1px solid var(--border); }
+.faq summary { cursor: pointer; list-style: none; padding: 20px 4px; font: 500 16px var(--sans); display: flex; justify-content: space-between; gap: 16px; }
+.faq summary::-webkit-details-marker { display: none; }
+.faq summary::after { content: "+"; font: 400 20px var(--mono); color: var(--brand); transition: transform .2s; }
+.faq details[open] summary::after { transform: rotate(45deg); }
+.faq details p { margin: 0 4px 22px; color: var(--text-2); max-width: 760px; }
+
+/* pied de page */
+footer { border-top: 1px solid var(--border); padding: 44px 0 56px; font: 12.5px var(--mono); color: var(--muted); }
+footer .wrap { display: flex; flex-wrap: wrap; gap: 18px 32px; justify-content: space-between; }
+footer a { color: var(--text-2); text-decoration: none; }
+footer a:hover { color: var(--text); }
+footer nav { display: flex; gap: 20px; flex-wrap: wrap; }
+
+@media (max-width: 860px) {
+  .nav-links { display: none; }
+  .split { grid-template-columns: 1fr; gap: 36px; }
+  section.block { padding: 64px 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  * { transition: none !important; }
+}
+</style>
+</head>
+<body>
+
+<header class="nav">
+  <div class="wrap">
+    <a class="brand" href="#accueil" aria-label="Coreboard, retour en haut"><img src="favicon.svg" alt="" width="26" height="26">Coreboard</a>
+    <nav class="nav-links" aria-label="Navigation principale">
+      <a href="#fonctionnalites">Fonctionnalités</a>
+      <a href="#captures">Captures</a>
+      <a href="#compatibilite">Compatibilité</a>
+      <a href="#faq">FAQ</a>
+    </nav>
+    <div class="nav-right">
+      <a class="icon-link" href="https://github.com/2Deathadder/coreboard" aria-label="Code source sur GitHub" rel="noopener">
+        <svg width="20" height="20" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
+      </a>
+      <a class="btn btn-primary btn-sm" href="#installation">Installer</a>
+    </div>
+  </div>
+</header>
+
+<main>
+<section class="hero" id="accueil">
+  <canvas id="pixels" aria-hidden="true"></canvas>
+  <div class="hero-content">
+    <a class="pill" href="https://github.com/2Deathadder/coreboard/releases/latest"><b>v1.0.3</b> Extraction et installation des jeux en un clic <span aria-hidden="true">→</span></a>
+    {{WORDMARK}}
+    <h1><span class="sr-only">Coreboard : </span>Le centre de contrôle matériel natif pour Linux</h1>
+    <p class="lead">Performances, processeur, GPU, écran, éclairage RGB, scénarios et jeux&nbsp;: tout ton PC dans une seule application rapide, écrite en C et GTK4.</p>
+    <div class="cta">
+      <a class="btn btn-primary" href="#installation">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 3v12m0 0l-5-5m5 5l5-5M4 21h16"/></svg>
+        Installer Coreboard
+      </a>
+      <a class="btn btn-ghost" href="#captures">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M6 4l14 8-14 8z"/></svg>
+        Voir l'interface
+      </a>
+    </div>
+    <p class="hero-meta">Gratuit · Open source (GPL-3.0) · Arch, Debian, Ubuntu, Fedora, openSUSE</p>
+  </div>
+</section>
+
+<section class="block" id="apropos">
+  <div class="wrap split">
+    <div>
+      <span class="eyebrow">Pourquoi Coreboard</span>
+      <h2>L'équivalent d'Armoury Crate, pensé pour Linux</h2>
+      <p class="section-lead">Sous Windows, les constructeurs fournissent un panneau pour tout régler. Sous Linux, il fallait jongler entre dix outils en ligne de commande. Coreboard les réunit dans une interface sombre et soignée.</p>
+      <ul class="points">
+        <li><b>Natif et léger</b> : écrit en C avec GTK4, démarre instantanément, aucun moteur web embarqué.</li>
+        <li><b>Il s'adapte à ton PC</b> : il détecte ce que ton matériel expose vraiment et masque le reste.</li>
+        <li><b>Sans compte ni télémétrie</b> : tout reste sur ta machine.</li>
+      </ul>
+    </div>
+    <div class="shot">
+      <img src="img/accueil.webp" width="1280" height="700" alt="Accueil de Coreboard : photo de l'appareil, utilisation du GPU et du CPU, ventilateurs, mémoire et modes de fonctionnement Silencieux, Équilibré, Turbo" fetchpriority="high">
+    </div>
+  </div>
+</section>
+
+<section class="block deep" id="fonctionnalites">
+  <div class="wrap">
+    <span class="eyebrow">Fonctionnalités</span>
+    <h2>Tout ton matériel, au même endroit</h2>
+    <p class="section-lead">Chaque réglage passe par les interfaces standard de Linux&nbsp;: power-profiles-daemon, sysfs, D-Bus, polkit.</p>
+    <div class="grid">
+      <article class="card">
+        <div class="ico"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 14l4-4M3.34 19a10 10 0 1117.32 0"/></svg></div>
+        <h3>Modes de fonctionnement</h3>
+        <p>Silencieux, Équilibré, Turbo&nbsp;: un clic bascule le profil d'alimentation du système.</p>
+      </article>
+      <article class="card">
+        <div class="ico"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="5" y="5" width="14" height="14" rx="2"/><path d="M9 9h6v6H9zM9 1v4M15 1v4M9 19v4M15 19v4M1 9h4M1 15h4M19 9h4M19 15h4"/></svg></div>
+        <h3>Processeur et GPU</h3>
+        <p>Turbo Boost, préférence énergétique, gouverneur, températures, fréquences et mode GPU hybride.</p>
+      </article>
+      <article class="card">
+        <div class="ico"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg></div>
+        <h3>Écran</h3>
+        <p>Fréquence de rafraîchissement, luminosité et filtre lumière bleue, sous Hyprland, Sway, KDE, GNOME ou X11.</p>
+      </article>
+      <article class="card">
+        <div class="ico"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="2" y="6" width="20" height="12" rx="2"/><path d="M6 10h.01M10 10h.01M14 10h.01M18 10h.01M7 14h10"/></svg></div>
+        <h3>Éclairage RGB</h3>
+        <p>Effets par zone, couleurs personnalisées et mode Musique qui fait réagir le clavier au son.</p>
+      </article>
+      <article class="card">
+        <div class="ico"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 2l9 5-9 5-9-5 9-5zM3 12l9 5 9-5M3 17l9 5 9-5"/></svg></div>
+        <h3>Scénarios</h3>
+        <p>Quand un jeu prend le focus, Coreboard applique le mode et la fréquence voulus, puis restaure les réglages.</p>
+      </article>
+      <article class="card">
+        <div class="ico"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M10 8l6 4-6 4z"/></svg></div>
+        <h3>Macros</h3>
+        <p>Enregistre des séquences de touches, rejoue-les avec répétitions et assigne-leur un raccourci global.</p>
+      </article>
+      <article class="card">
+        <div class="ico"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M6 11h4M8 9v4M15 12h.01M18 10h.01M17.32 5H6.68a4 4 0 00-3.98 3.59L2 15a3 3 0 005.12 2.12L9 15h6l1.88 2.12A3 3 0 0022 15l-.7-6.41A4 4 0 0017.32 5z"/></svg></div>
+        <h3>Bibliothèque de jeux</h3>
+        <p>Steam, Epic (Legendary), GOG, Lutris et applications de jeu, réunis et lançables d'un clic.</p>
+      </article>
+      <article class="card">
+        <div class="ico"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M3 5l8-1.5v8H3zM13 3.2L21 2v9.5h-8zM3 13h8v8L3 19.5zM13 13h8v9l-8-1.3z"/></svg></div>
+        <h3>Jeux Windows</h3>
+        <p>Proton-GE et umu-launcher, DLSS, ray tracing, GameMode, MangoHud et un diagnostic qui optimise le système.</p>
+      </article>
+    </div>
+  </div>
+</section>
+
+<section class="block" id="captures">
+  <div class="wrap">
+    <span class="eyebrow">Captures</span>
+    <h2>Une interface sombre, nette et lisible</h2>
+    <p class="section-lead">Barre latérale, en-têtes rouges, cartes de mesures en direct&nbsp;: l'ergonomie des centres de contrôle gaming, sans leur lourdeur.</p>
+    <div class="gallery">
+      <div class="tabs" role="tablist" aria-label="Pages de Coreboard">
+        <button class="tab" role="tab" aria-selected="true" aria-controls="cap" data-img="img/performances.webp" data-cap="Performances : profil, Turbo Boost, préférence énergétique, ventilateurs et températures.">Performances</button>
+        <button class="tab" role="tab" aria-selected="false" aria-controls="cap" data-img="img/eclairage.webp" data-cap="Éclairage : aperçu du clavier par zone, effets, couleur et luminosité.">Éclairage</button>
+        <button class="tab" role="tab" aria-selected="false" aria-controls="cap" data-img="img/ecran.webp" data-cap="Écran et GPU : mode GPU hybride, luminosité et filtre lumière bleue.">Écran &amp; GPU</button>
+        <button class="tab" role="tab" aria-selected="false" aria-controls="cap" data-img="img/jeux-windows.webp" data-cap="Jeux Windows : environnement Proton prêt et diagnostic d'optimisation du système.">Jeux Windows</button>
+      </div>
+      <figure id="cap" role="tabpanel">
+        <div class="shot"><img id="cap-img" src="img/performances.webp" width="1280" height="700" loading="lazy" alt="Page Performances de Coreboard : profil, Turbo Boost, préférence énergétique, ventilateurs et températures"></div>
+        <figcaption id="cap-txt">Performances : profil, Turbo Boost, préférence énergétique, ventilateurs et températures.</figcaption>
+      </figure>
+    </div>
+  </div>
+</section>
+
+<section class="block deep" id="compatibilite">
+  <div class="wrap">
+    <span class="eyebrow">Compatibilité</span>
+    <h2>Toutes les distributions, tous les bureaux</h2>
+    <p class="section-lead">Coreboard choisit lui-même le bon outil selon ton système, et installe ce qui manque avec le gestionnaire de paquets de ta distribution.</p>
+    <div class="chips" aria-label="Distributions prises en charge">
+      <span class="chip">Arch Linux</span><span class="chip">Omarchy</span><span class="chip">CachyOS</span><span class="chip">EndeavourOS</span><span class="chip">Manjaro</span>
+      <span class="chip">Ubuntu 24.04+</span><span class="chip">Debian 13+</span><span class="chip">Linux Mint</span><span class="chip">Fedora 38+</span><span class="chip">openSUSE Tumbleweed</span>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <caption class="sr-only">Fonctions disponibles selon le bureau</caption>
+        <thead><tr><th scope="col">Fonction</th><th scope="col">Hyprland</th><th scope="col">Sway</th><th scope="col">KDE Plasma</th><th scope="col">GNOME</th><th scope="col">X11</th></tr></thead>
+        <tbody>
+          <tr><th scope="row">Matériel, profils, CPU, GPU, audio</th><td class="y">Oui</td><td class="y">Oui</td><td class="y">Oui</td><td class="y">Oui</td><td class="y">Oui</td></tr>
+          <tr><th scope="row">Fréquence d'écran</th><td class="y">Oui</td><td class="y">Oui</td><td class="y">Oui</td><td class="y">Oui</td><td class="y">Oui</td></tr>
+          <tr><th scope="row">Filtre lumière bleue</th><td class="y">Oui</td><td class="y">Oui</td><td class="y">Natif</td><td class="y">Natif</td><td class="y">Oui</td></tr>
+          <tr><th scope="row">Scénarios par application</th><td class="y">Oui</td><td class="y">Oui</td><td class="y">Jeux XWayland</td><td class="y">Jeux XWayland</td><td class="y">Oui</td></tr>
+          <tr><th scope="row">Macros (rejeu)</th><td class="y">wtype</td><td class="y">wtype</td><td class="y">ydotool</td><td class="y">ydotool</td><td class="y">xdotool</td></tr>
+          <tr><th scope="row">GameVisual (filtre d'écran)</th><td class="y">Oui</td><td class="n">—</td><td class="n">—</td><td class="n">—</td><td class="n">—</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="note">Processeurs Intel, AMD et ARM · GPU NVIDIA, AMD et Intel · GTK 4.10 ou plus récent requis.</p>
+  </div>
+</section>
+
+<section class="block" id="installation">
+  <div class="wrap">
+    <span class="eyebrow">Installation</span>
+    <h2>Installe Coreboard en deux minutes</h2>
+    <p class="section-lead">Choisis ta distribution, copie les commandes dans un terminal.</p>
+    <div class="install">
+      <div class="tabs" role="tablist" aria-label="Distribution">
+        <button class="tab" role="tab" aria-selected="true" data-target="i-arch">Arch &amp; dérivées</button>
+        <button class="tab" role="tab" aria-selected="false" data-target="i-deb">Debian / Ubuntu</button>
+        <button class="tab" role="tab" aria-selected="false" data-target="i-fed">Fedora</button>
+        <button class="tab" role="tab" aria-selected="false" data-target="i-suse">openSUSE</button>
+      </div>
+      <div class="code" id="i-arch" role="tabpanel"><button class="btn btn-ghost btn-sm copy">Copier</button><pre><code><span class="c"># paquet natif : démon de refroidissement et règle udev inclus</span>
+<span class="p">$ </span>git clone https://github.com/2Deathadder/coreboard.git
+<span class="p">$ </span>cd coreboard/packaging/arch &amp;&amp; makepkg -si</code></pre></div>
+      <div class="code" id="i-deb" role="tabpanel" hidden><button class="btn btn-ghost btn-sm copy">Copier</button><pre><code><span class="p">$ </span>sudo apt install -y git
+<span class="p">$ </span>git clone https://github.com/2Deathadder/coreboard.git &amp;&amp; cd coreboard
+<span class="p">$ </span>make deps &amp;&amp; make &amp;&amp; make install</code></pre></div>
+      <div class="code" id="i-fed" role="tabpanel" hidden><button class="btn btn-ghost btn-sm copy">Copier</button><pre><code><span class="p">$ </span>sudo dnf install -y git
+<span class="p">$ </span>git clone https://github.com/2Deathadder/coreboard.git &amp;&amp; cd coreboard
+<span class="p">$ </span>make deps &amp;&amp; make &amp;&amp; make install</code></pre></div>
+      <div class="code" id="i-suse" role="tabpanel" hidden><button class="btn btn-ghost btn-sm copy">Copier</button><pre><code><span class="p">$ </span>sudo zypper install -y git
+<span class="p">$ </span>git clone https://github.com/2Deathadder/coreboard.git &amp;&amp; cd coreboard
+<span class="p">$ </span>make deps &amp;&amp; make &amp;&amp; make install</code></pre></div>
+    </div>
+    <p class="note">Ensuite, lance <code>coreboard</code> depuis le menu des applications. Un raccourci clavier sur <code>coreboard --toggle</code> ouvre et ferme la fenêtre.</p>
+  </div>
+</section>
+
+<section class="block deep" id="faq">
+  <div class="wrap">
+    <span class="eyebrow">Questions fréquentes</span>
+    <h2>FAQ</h2>
+    <div class="faq">
+      <details><summary>Coreboard est-il une alternative à Armoury Crate ou MSI Center sous Linux&nbsp;?</summary><p>Oui. Coreboard regroupe dans une seule application native ce que proposent Armoury Crate ou MSI Center sous Windows&nbsp;: modes de performance, réglages du processeur et du GPU, écran, éclairage RGB, scénarios par application et gestion des jeux. Il n'est affilié ni à ASUS ni à MSI.</p></details>
+      <details><summary>Sur quelles distributions Linux Coreboard fonctionne-t-il&nbsp;?</summary><p>Arch Linux et ses dérivées (Omarchy, CachyOS, EndeavourOS, Manjaro), Debian 13 et Ubuntu 24.04 ou plus récents, Fedora 38 ou plus récent et openSUSE Tumbleweed. Il faut GTK 4.10 ou plus récent.</p></details>
+      <details><summary>Quels bureaux sont pris en charge&nbsp;?</summary><p>Hyprland, Sway, KDE Plasma, GNOME et les bureaux X11. Les fonctions s'adaptent&nbsp;: fréquence d'écran via le bureau, filtre lumière bleue natif sous GNOME et KDE, détection des jeux XWayland.</p></details>
+      <details><summary>Mon PC doit-il être un MSI ou un ASUS&nbsp;?</summary><p>Non. Coreboard détecte ce que ton PC expose réellement (processeur Intel, AMD ou ARM, GPU NVIDIA, AMD ou Intel, écran, batterie) et masque ce qui n'existe pas. Seuls l'éclairage du clavier et le refroidissement adaptatif sont propres à certains portables MSI.</p></details>
+      <details><summary>Coreboard est-il gratuit&nbsp;?</summary><p>Oui, Coreboard est un logiciel libre et gratuit sous licence GPL-3.0. Le code source est sur <a href="https://github.com/2Deathadder/coreboard">GitHub</a>.</p></details>
+    </div>
+  </div>
+</section>
+</main>
+
+<footer>
+  <div class="wrap">
+    <div>© 2026 Coreboard · Logiciel libre sous licence GPL-3.0<br>Coreboard n'est affilié ni à ASUS, ni à MSI, ni à Omarchy.</div>
+    <nav aria-label="Liens du pied de page">
+      <a href="https://github.com/2Deathadder/coreboard">GitHub</a>
+      <a href="https://github.com/2Deathadder/coreboard/releases">Versions</a>
+      <a href="https://github.com/2Deathadder/coreboard/issues">Signaler un problème</a>
+      <a href="https://github.com/2Deathadder/coreboard/blob/master/LICENSE">Licence</a>
+    </nav>
+  </div>
+</footer>
+
+<script>
+/* champ de pixels du héros : grille de carrés rouges qui scintillent doucement */
+(function () {
+  const cv = document.getElementById('pixels'), ctx = cv.getContext('2d');
+  const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const COLORS = ['#3a0a12', '#5c0d1a', '#8a1022', '#c8102e', '#ff1a3a'];
+  let cells = [], step = 18, w = 0, h = 0, raf = 0, visible = true;
+  function build() {
+    const dpr = Math.min(devicePixelRatio || 1, 2), r = cv.getBoundingClientRect();
+    w = r.width; h = r.height; cv.width = w * dpr; cv.height = h * dpr; ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    step = w < 640 ? 14 : 18; cells = [];
+    for (let y = 0; y < h; y += step) for (let x = 0; x < w; x += step) {
+      const edge = Math.min(x, w - x) / w;                 // plus dense sur les bords, comme une trame
+      if (Math.random() < 0.02 + Math.pow(0.5 - edge, 2) * 0.9) cells.push({ x, y, c: Math.random() * 3 | 0, t: Math.random() * 6.28, s: 0.4 + Math.random() * 1.2 });
+    }
+  }
+  function draw(time) {
+    ctx.clearRect(0, 0, w, h);
+    const sz = step - 6;
+    for (const p of cells) {
+      const k = reduce ? 0.5 : (Math.sin(p.t + time * 0.001 * p.s) + 1) / 2;
+      ctx.fillStyle = COLORS[Math.min(4, p.c + (k > 0.92 ? 2 : k > 0.75 ? 1 : 0))];
+      ctx.globalAlpha = 0.25 + k * 0.55;
+      ctx.fillRect(p.x, p.y, sz, sz);
+    }
+    ctx.globalAlpha = 1;
+    if (!reduce && visible) raf = requestAnimationFrame(draw);
+  }
+  build(); draw(0);
+  addEventListener('resize', () => { build(); if (reduce) draw(0); });
+  new IntersectionObserver(([e]) => { visible = e.isIntersecting; cancelAnimationFrame(raf); if (visible && !reduce) raf = requestAnimationFrame(draw); }).observe(cv);
+})();
+
+/* onglets : captures et installation */
+document.querySelectorAll('[role="tablist"]').forEach(list => {
+  const tabs = [...list.querySelectorAll('.tab')];
+  tabs.forEach(t => t.addEventListener('click', () => {
+    tabs.forEach(o => o.setAttribute('aria-selected', o === t));
+    if (t.dataset.img) {
+      const img = document.getElementById('cap-img');
+      img.src = t.dataset.img; img.alt = 'Page ' + t.textContent + ' de Coreboard : ' + t.dataset.cap;
+      document.getElementById('cap-txt').textContent = t.dataset.cap;
+    }
+    if (t.dataset.target) tabs.forEach(o => { document.getElementById(o.dataset.target).hidden = o !== t; });
+  }));
+});
+
+/* bouton Copier : sans les invites « $ » ni les commentaires */
+document.querySelectorAll('.copy').forEach(b => b.addEventListener('click', async () => {
+  const code = b.parentElement.querySelector('code').cloneNode(true);
+  code.querySelectorAll('.p, .c').forEach(n => n.remove());
+  const text = code.textContent.split('\n').map(l => l.trim()).filter(Boolean).join('\n');
+  try { await navigator.clipboard.writeText(text); b.textContent = 'Copié'; } catch { b.textContent = 'Échec'; }
+  setTimeout(() => b.textContent = 'Copier', 1600);
+}));
+</script>
+</body>
+</html>

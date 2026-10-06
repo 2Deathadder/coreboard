@@ -17,6 +17,7 @@
 #include "winrun.h"
 #include "music.h"
 #include "rgb.h"
+#include "compat.h"
 
 #ifndef DATADIR
 #define DATADIR "/usr/local/share/coreboard"
@@ -94,6 +95,32 @@ static void on_tool_installed(const char *pkg, gboolean ok, const char *why) {
     if (ok) g_snprintf(b, sizeof b, "%s installé", pkg);
     else g_snprintf(b, sizeof b, "Installation de %s : %s", pkg, why ? why : "échec");
     show_toast(b);
+}
+
+/* installation d'un paquet de la distribution en tâche de fond (une demande de mot de passe), avec toast du résultat */
+typedef struct { char logical[32], label[48]; gboolean ok; } PkgJob;
+static gboolean pkg_busy;
+static gboolean pkg_done_idle(gpointer p) {
+    PkgJob *j = p; char b[160];
+    g_snprintf(b, sizeof b, j->ok ? "%s installé" : "Installation de %s annulée ou impossible", j->label);
+    show_toast(b); pkg_busy = FALSE; g_free(j);
+    if (area) gtk_widget_queue_draw(area);
+    return G_SOURCE_REMOVE;
+}
+static gpointer pkg_thread(gpointer p) { PkgJob *j = p; const char *l[] = {j->logical, NULL}; j->ok = compat_install_pkgs(l); g_idle_add(pkg_done_idle, j); return NULL; }
+static void install_pkg_async(const char *logical, const char *label) {
+    if (pkg_busy) return;
+    if (!compat_pkg_available(logical)) { char b[160]; g_snprintf(b, sizeof b, "%s n'est pas proposé par %s : installe-le à la main", label, compat_distro_name()); show_toast(b); return; }
+    pkg_busy = TRUE;
+    PkgJob *j = g_new0(PkgJob, 1); g_strlcpy(j->logical, logical, sizeof j->logical); g_strlcpy(j->label, label, sizeof j->label);
+    g_thread_unref(g_thread_new("coreboard-pkg", pkg_thread, j));
+}
+
+/* outil de saisie simulée adapté à la session : wtype (Hyprland, Sway…), xdotool (X11), ydotool (GNOME/KDE Wayland) */
+static const char *macro_tool_for_session(void) {
+    if (!g_getenv("WAYLAND_DISPLAY")) return "xdotool";
+    if (compat_win_backend() == WB_HYPRLAND || compat_win_backend() == WB_SWAY) return "wtype";
+    return "ydotool";
 }
 
 static void on_job(const char *msg, gboolean ok, gpointer d) {
@@ -854,7 +881,12 @@ static void page_scenarios(cairo_t *cr) {
     text(cr, "Quand une application prend le focus, applique un mode de fonctionnement et une fréquence d'écran, puis restaure les réglages précédents.", X0, 82, 12.5, 400, F_SANS, C_MUTE, 1, 0, 0);
     const char *act_name = fx_scenario_active();
     if (act_name) { char b[96]; g_snprintf(b, sizeof b, "Actif : %s", act_name); text(cr, b, XR, 51, 13, 600, F_SANS, C_RED, 1, 2, 0); }
-    if (!fx_windows_supported()) text(cr, "La détection de la fenêtre active nécessite Hyprland : les profils ne s'appliqueront pas.", X0, 104, 12.5, 400, F_SANS, C_RED, 1, 0, 0);
+    if (!fx_windows_supported()) {
+        text(cr, g_getenv("DISPLAY") ? "Détection de la fenêtre active indisponible : xprop est nécessaire (Hyprland et Sway n'en ont pas besoin)."
+                                     : "Détection de la fenêtre active indisponible sur ce bureau (Hyprland, Sway ou X11/XWayland requis).", X0, 104, 12.5, 400, F_SANS, C_RED, 1, 0, 0);
+        if (g_getenv("DISPLAY") && outline_btn(cr, XR - 400, 38, 130, 26, pkg_busy ? "Installation…" : "Installer xprop", 12) && !pkg_busy) install_pkg_async("xprop", "xprop");
+    } else if (compat_win_backend() == WB_X11 && g_getenv("WAYLAND_DISPLAY"))
+        text(cr, "Bureau Wayland (GNOME/KDE) : seuls les jeux et applications XWayland sont détectés — c'est le cas de la plupart des jeux Proton/Wine.", X0, 104, 12.5, 400, F_SANS, C_MUTE, 1, 0, 0);
     double y = 122;
     if (!n) { text(cr, "Aucun profil. Ajoute-en un depuis une application ouverte ci-dessous.", X0, y + 14, 14, 400, F_SANS, C_MUTE, 1, 0, 0); y += 44; }
     for (int i = 0; i < n; i++) {
@@ -901,7 +933,7 @@ static void page_scenarios(cairo_t *cr) {
         double cw2; if (chip(cr, cx, cy, w[i].cls, &cw2)) { const char *dot = strrchr(w[i].cls, '.'); fx_scenario_add(dot && dot[1] ? dot + 1 : w[i].cls, w[i].cls); return; }
         cx += cw2 + 10; shown++;
     }
-    if (!shown) text(cr, fx_windows_supported() ? "Aucune autre application ouverte." : "Indisponible hors Hyprland.", X0, cy + 15, 12.5, 400, F_SANS, C_MUTE, 1, 0, 0);
+    if (!shown) text(cr, fx_windows_supported() ? "Aucune autre application ouverte." : "Indisponible sur ce bureau (Hyprland, Sway ou X11/XWayland requis).", X0, cy + 15, 12.5, 400, F_SANS, C_MUTE, 1, 0, 0);
     page_h = cy + 60;
 }
 
@@ -1180,7 +1212,7 @@ static void page_games(cairo_t *cr) {
         double cw2; if (chip(cr, cx, cy, w[i].cls, &cw2)) { fx_game_add_manual(&w[i]); show_toast("Application ajoutée à la bibliothèque"); return; }
         cx += cw2 + 10; shown++;
     }
-    if (!shown) text(cr, fx_windows_supported() ? "Aucune autre application ouverte." : "Indisponible hors Hyprland.", X0, cy + 15, 12.5, 400, F_SANS, C_MUTE, 1, 0, 0);
+    if (!shown) text(cr, fx_windows_supported() ? "Aucune autre application ouverte." : "Indisponible sur ce bureau (Hyprland, Sway ou X11/XWayland requis).", X0, cy + 15, 12.5, 400, F_SANS, C_MUTE, 1, 0, 0);
     /* ---- jeux gratuits Steam (free-to-play) : recherche publique + installation réelle via steam://install ---- */
     cy += 50;
     { static gint64 sf_last;
@@ -1753,7 +1785,12 @@ static void page_macros(cairo_t *cr) {
     int n; Macro *m = mx_list(&n);
     ptitle(cr, "Macros");
     text(cr, "Enregistre des touches tapées dans cette fenêtre, puis rejoue-les ou lance-les avec un raccourci.", X0, 82, 12.5, 400, F_SANS, C_MUTE, 1, 0, 0);
-    if (!mx_wtype_available()) text(cr, "wtype est introuvable : le rejeu est impossible.", X0, 104, 12.5, 400, F_SANS, C_RED, 1, 0, 0);
+    if (!mx_wtype_available()) {
+        const char *tool = macro_tool_for_session(); char b[200];
+        g_snprintf(b, sizeof b, "Rejeu impossible : %s est nécessaire pour simuler le clavier%s.", tool, !strcmp(tool, "ydotool") ? " (avec le service ydotoold actif)" : "");
+        text(cr, b, X0, 104, 12.5, 400, F_SANS, C_RED, 1, 0, 0);
+        if (outline_btn(cr, XR - 400, 38, 130, 26, pkg_busy ? "Installation…" : "Installer", 12) && !pkg_busy) install_pkg_async(tool, tool);
+    }
     if (outline_btn(cr, XR - 260, 38, 130, 26, "Nouvelle macro", 12)) {
         char nm[48]; g_snprintf(nm, sizeof nm, "Macro %d", n + 1);
         int i = mx_add(nm); if (i >= 0) { mx_rec_start(i, FALSE); mx_open_idx = i; } else show_toast("Nombre maximal de macros atteint");
@@ -1786,7 +1823,15 @@ static void page_macros(cairo_t *cr) {
         double bx = XR - 18 - 28;
         if (small_btn(cr, bx, y + 14, 28, "×", FALSE)) { mx_remove(i); if (mx_open_idx == i) mx_open_idx = -1; else if (mx_open_idx > i) mx_open_idx--; reload_hypr_then_reapply(); return; }
         bx -= 8 + 84; if (small_btn(cr, bx, y + 14, 84, mx_open_idx == i ? "Étapes ▴" : "Étapes ▾", mx_open_idx == i)) mx_open_idx = mx_open_idx == i ? -1 : i;
-        bx -= 8 + 100; if (small_btn(cr, bx, y + 14, 100, "Raccourci", mx_bind_idx == i)) { mx_bind_idx = mx_bind_idx == i ? -1 : i; mx_rec_stop(); }
+        bx -= 8 + 100; if (small_btn(cr, bx, y + 14, 100, "Raccourci", mx_bind_idx == i)) {
+            if (compat_win_backend() == WB_HYPRLAND) { mx_bind_idx = mx_bind_idx == i ? -1 : i; mx_rec_stop(); }
+            else {                                             /* autres bureaux : raccourci à déclarer dans leurs réglages */
+                gchar *qn = g_shell_quote(m[i].name), *cmd = g_strdup_printf("coreboard --macro %s", qn);
+                gdk_clipboard_set_text(gtk_widget_get_clipboard(area), cmd);
+                show_toast("Commande copiée : ajoute-la comme raccourci personnalisé dans les réglages clavier du bureau");
+                g_free(cmd); g_free(qn);
+            }
+        }
         bx -= 8 + 110; if (small_btn(cr, bx, y + 14, 110, "Enregistrer", mx_recording() && mx_rec_index() == i)) { if (mx_recording() && mx_rec_index() == i) mx_rec_stop(); else { mx_rec_start(i, FALSE); mx_bind_idx = -1; mx_open_idx = i; } }
         bx -= 8 + 84; if (small_btn(cr, bx, y + 14, 84, m[i].playing ? "…" : "Lancer", FALSE)) { mx_play_async(i); show_toast("Macro lancée : le focus doit être sur l'application cible"); }
         /* répétitions */
@@ -2654,6 +2699,7 @@ static int inspect_cli(const char *path) {
 }
 
 int main(int argc, char **argv) {
+    compat_init();                                 /* ~/.local/bin dans le PATH : outils installés sans root */
     for (int i = 1; i < argc; i++)
         if (!strcmp(argv[i], "--set-image")) {
             if (i + 1 >= argc) { g_printerr("Usage : coreboard --set-image FICHIER_OU_URL\n"); return 2; }

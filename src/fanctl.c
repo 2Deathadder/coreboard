@@ -3,6 +3,7 @@
  * Il règle les ventilateurs selon la température (max CPU/GPU) et sa vitesse de montée, puis rend la main quand
  * coreboard ferme son stdin (fin du jeu) ou à l'expiration de la fenêtre. */
 #include "fanctl.h"
+#include "compat.h"
 #include <signal.h>
 #include <sys/stat.h>
 #include <string.h>
@@ -36,7 +37,7 @@ static char *daemon_path(void) {
 }
 
 gboolean fan_supported(void) {
-    char *p = daemon_path(); gboolean ok = p && g_find_program_in_path("pkexec") && g_find_program_in_path("python3");
+    char *p = daemon_path(); gboolean ok = p && compat_has("pkexec") && compat_has("python3");
     g_free(p); return ok;
 }
 int fan_level(void) { return level; }

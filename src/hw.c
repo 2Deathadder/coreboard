@@ -472,7 +472,209 @@ static void add_mode(Disp *d, int hz) {
     if (d->nmodes < 16) d->modes[d->nmodes++] = hz;
 }
 
+static void add_mode_id(Disp *d, int hz, const char *id) {
+    for (int i = 0; i < d->nmodes; i++) if (d->modes[i] == hz) return;
+    if (d->nmodes < 16) { g_strlcpy(d->mode_ids[d->nmodes], id, sizeof d->mode_ids[0]); d->modes[d->nmodes++] = hz; }
+}
+
+/* tri décroissant des fréquences en gardant leur identifiant de mode */
+static void sort_modes(Disp *d) {
+    for (int i = 1; i < d->nmodes; i++)
+        for (int j = i; j > 0 && d->modes[j] > d->modes[j - 1]; j--) {
+            int t = d->modes[j]; d->modes[j] = d->modes[j - 1]; d->modes[j - 1] = t;
+            char b[32]; memcpy(b, d->mode_ids[j], 32); memcpy(d->mode_ids[j], d->mode_ids[j - 1], 32); memcpy(d->mode_ids[j - 1], b, 32);
+        }
+}
+
+/* Sway : swaymsg -t get_outputs (fréquences en mHz) */
+static gboolean read_sway(Disp *d) {
+    if (!g_getenv("SWAYSOCK") || !has_cmd("swaymsg")) return FALSE;
+    char *argv[] = {"swaymsg", "-t", "get_outputs", "-r", NULL};
+    gchar *o = run_out(argv, NULL, 0); if (!o) return FALSE;
+    JsonParser *p = json_parser_new();
+    if (json_parser_load_from_data(p, o, -1, NULL) && JSON_NODE_HOLDS_ARRAY(json_parser_get_root(p))) {
+        JsonArray *a = json_node_get_array(json_parser_get_root(p));
+        for (guint i = 0; i < json_array_get_length(a) && !d->backend[0]; i++) {
+            JsonObject *out = json_array_get_object_element(a, i);
+            if (!json_object_get_boolean_member_with_default(out, "active", FALSE) || !json_object_has_member(out, "current_mode")) continue;
+            JsonObject *cm = json_object_get_object_member(out, "current_mode");
+            d->w = json_object_get_int_member(cm, "width"); d->h = json_object_get_int_member(cm, "height");
+            d->hz = (int)lround(json_object_get_int_member(cm, "refresh") / 1000.0);
+            JsonArray *ms = json_object_get_array_member(out, "modes");
+            for (guint k = 0; ms && k < json_array_get_length(ms); k++) {
+                JsonObject *m = json_array_get_object_element(ms, k);
+                if (json_object_get_int_member(m, "width") != d->w || json_object_get_int_member(m, "height") != d->h) continue;
+                gint64 mhz = json_object_get_int_member(m, "refresh");
+                char id[32]; g_snprintf(id, sizeof id, "%dx%d@%.3fHz", d->w, d->h, mhz / 1000.0);
+                add_mode_id(d, (int)lround(mhz / 1000.0), id);
+            }
+            g_strlcpy(d->backend, "sway", sizeof d->backend);
+            g_strlcpy(d->name, json_object_get_string_member_with_default(out, "name", ""), sizeof d->name);
+            d->scale = json_object_get_double_member_with_default(out, "scale", 1);
+        }
+    }
+    g_object_unref(p); g_free(o);
+    return d->backend[0] != 0;
+}
+
+/* KDE Plasma : kscreen-doctor -j */
+static gboolean read_kde(Disp *d) {
+    if (!has_cmd("kscreen-doctor")) return FALSE;
+    const char *dk = g_getenv("XDG_CURRENT_DESKTOP"); if (!dk || !strstr(dk, "KDE")) return FALSE;
+    char *argv[] = {"kscreen-doctor", "-j", NULL};
+    gchar *o = run_out(argv, NULL, 0); if (!o) return FALSE;
+    JsonParser *p = json_parser_new();
+    if (json_parser_load_from_data(p, o, -1, NULL) && JSON_NODE_HOLDS_OBJECT(json_parser_get_root(p))) {
+        JsonObject *root = json_node_get_object(json_parser_get_root(p));
+        JsonArray *a = json_object_has_member(root, "outputs") ? json_object_get_array_member(root, "outputs") : NULL;
+        for (guint i = 0; a && i < json_array_get_length(a) && !d->backend[0]; i++) {
+            JsonObject *out = json_array_get_object_element(a, i);
+            if (!json_object_get_boolean_member_with_default(out, "enabled", FALSE)) continue;
+            JsonNode *cur = json_object_get_member(out, "currentModeId");
+            char curid[32] = "";
+            if (cur && JSON_NODE_HOLDS_VALUE(cur)) {
+                if (json_node_get_value_type(cur) == G_TYPE_STRING) g_strlcpy(curid, json_node_get_string(cur), sizeof curid);
+                else g_snprintf(curid, sizeof curid, "%" G_GINT64_FORMAT, json_node_get_int(cur));
+            }
+            JsonArray *ms = json_object_get_array_member(out, "modes");
+            for (int pass = 0; pass < 2; pass++)                 /* 1er passage : mode courant ; 2e : modes de même définition */
+                for (guint k = 0; ms && k < json_array_get_length(ms); k++) {
+                    JsonObject *m = json_array_get_object_element(ms, k);
+                    JsonNode *idn = json_object_get_member(m, "id"); char id[32] = "";
+                    if (idn && json_node_get_value_type(idn) == G_TYPE_STRING) g_strlcpy(id, json_node_get_string(idn), sizeof id);
+                    else if (idn) g_snprintf(id, sizeof id, "%" G_GINT64_FORMAT, json_node_get_int(idn));
+                    JsonObject *sz = json_object_has_member(m, "size") ? json_object_get_object_member(m, "size") : NULL;
+                    int w = sz ? (int)json_object_get_int_member(sz, "width") : 0, h = sz ? (int)json_object_get_int_member(sz, "height") : 0;
+                    int hz = (int)lround(json_object_get_double_member_with_default(m, "refreshRate", 0));
+                    if (pass == 0 && !strcmp(id, curid)) { d->w = w; d->h = h; d->hz = hz; }
+                    if (pass == 1 && w == d->w && h == d->h && hz) add_mode_id(d, hz, id);
+                }
+            if (d->w) {
+                g_strlcpy(d->backend, "kde", sizeof d->backend);
+                g_strlcpy(d->name, json_object_get_string_member_with_default(out, "name", ""), sizeof d->name);
+                d->scale = json_object_get_double_member_with_default(out, "scale", 1);
+            }
+        }
+    }
+    g_object_unref(p); g_free(o);
+    return d->backend[0] != 0;
+}
+
+/* GNOME (Wayland ou X11) : interface D-Bus de Mutter */
+#define MUTTER_STATE_T "(ua((ssss)a(siiddada{sv})a{sv})a(iiduba(ssss)a{sv})a{sv})"
+static GVariant *mutter_state(GDBusConnection **busp) {
+    const char *dk = g_getenv("XDG_CURRENT_DESKTOP"); if (!dk || !strstr(dk, "GNOME")) return NULL;
+    GDBusConnection *bus = g_bus_get_sync(G_BUS_TYPE_SESSION, NULL, NULL); if (!bus) return NULL;
+    GVariant *r = g_dbus_connection_call_sync(bus, "org.gnome.Mutter.DisplayConfig", "/org/gnome/Mutter/DisplayConfig", "org.gnome.Mutter.DisplayConfig",
+        "GetCurrentState", NULL, G_VARIANT_TYPE(MUTTER_STATE_T), G_DBUS_CALL_FLAGS_NONE, 2000, NULL, NULL);
+    if (busp && r) *busp = bus; else g_object_unref(bus);
+    return r;
+}
+
+/* mode courant (identifiant) d'un connecteur dans l'état Mutter */
+static gboolean mutter_current_mode(GVariant *monitors, const char *conn, char *id, size_t n, int *w, int *h, double *hz) {
+    GVariantIter it; GVariant *mon; gboolean found = FALSE;
+    g_variant_iter_init(&it, monitors);
+    while (!found && (mon = g_variant_iter_next_value(&it))) {
+        const char *c; g_variant_get_child(mon, 0, "(&s&s&s&s)", &c, NULL, NULL, NULL);
+        if (!strcmp(c, conn)) {
+            GVariant *modes = g_variant_get_child_value(mon, 1); GVariantIter mi; GVariant *m;
+            g_variant_iter_init(&mi, modes);
+            while (!found && (m = g_variant_iter_next_value(&mi))) {
+                const char *mid; gint32 mw, mh; double r; GVariant *props = g_variant_get_child_value(m, 6);
+                g_variant_get_child(m, 0, "&s", &mid); g_variant_get_child(m, 1, "i", &mw); g_variant_get_child(m, 2, "i", &mh); g_variant_get_child(m, 3, "d", &r);
+                gboolean curm = FALSE; g_variant_lookup(props, "is-current", "b", &curm);
+                if (curm) { g_strlcpy(id, mid, n); if (w) *w = mw; if (h) *h = mh; if (hz) *hz = r; found = TRUE; }
+                g_variant_unref(props); g_variant_unref(m);
+            }
+            g_variant_unref(modes);
+        }
+        g_variant_unref(mon);
+    }
+    return found;
+}
+
+static gboolean read_gnome(Disp *d) {
+    GVariant *st = mutter_state(NULL); if (!st) return FALSE;
+    GVariant *monitors = g_variant_get_child_value(st, 1), *logical = g_variant_get_child_value(st, 2);
+    char conn[40] = "";
+    GVariantIter it; GVariant *lm;                            /* moniteur logique principal → son premier connecteur */
+    g_variant_iter_init(&it, logical);
+    while ((lm = g_variant_iter_next_value(&it))) {
+        gboolean primary; gint32 x, y; double sc; g_variant_get_child(lm, 4, "b", &primary);
+        g_variant_get_child(lm, 0, "i", &x); g_variant_get_child(lm, 1, "i", &y); g_variant_get_child(lm, 2, "d", &sc);
+        GVariant *mons = g_variant_get_child_value(lm, 5);
+        if ((primary || !conn[0]) && g_variant_n_children(mons)) {
+            const char *c; g_variant_get_child(mons, 0, "(&s&s&s&s)", &c, NULL, NULL, NULL);
+            g_strlcpy(conn, c, sizeof conn); d->x = x; d->y = y; d->scale = sc;
+        }
+        g_variant_unref(mons); g_variant_unref(lm);
+    }
+    char curid[32]; double hz = 0;
+    if (conn[0] && mutter_current_mode(monitors, conn, curid, sizeof curid, &d->w, &d->h, &hz)) {
+        d->hz = (int)lround(hz);
+        GVariantIter mi; GVariant *mon;                       /* fréquences disponibles à la même définition */
+        g_variant_iter_init(&mi, monitors);
+        while ((mon = g_variant_iter_next_value(&mi))) {
+            const char *c; g_variant_get_child(mon, 0, "(&s&s&s&s)", &c, NULL, NULL, NULL);
+            if (!strcmp(c, conn)) {
+                GVariant *modes = g_variant_get_child_value(mon, 1); GVariantIter ki; GVariant *m;
+                g_variant_iter_init(&ki, modes);
+                while ((m = g_variant_iter_next_value(&ki))) {
+                    const char *mid; gint32 mw, mh; double r;
+                    g_variant_get_child(m, 0, "&s", &mid); g_variant_get_child(m, 1, "i", &mw); g_variant_get_child(m, 2, "i", &mh); g_variant_get_child(m, 3, "d", &r);
+                    if (mw == d->w && mh == d->h) add_mode_id(d, (int)lround(r), mid);
+                    g_variant_unref(m);
+                }
+                g_variant_unref(modes);
+            }
+            g_variant_unref(mon);
+        }
+        g_strlcpy(d->backend, "gnome", sizeof d->backend); g_strlcpy(d->name, conn, sizeof d->name);
+    }
+    g_variant_unref(monitors); g_variant_unref(logical); g_variant_unref(st);
+    return d->backend[0] != 0;
+}
+
+/* applique un mode à un connecteur en gardant la disposition actuelle (méthode 1 : temporaire, sans fenêtre de confirmation) */
+static gboolean set_gnome(const char *conn, const char *mode_id, char *msg, size_t n) {
+    GDBusConnection *bus = NULL; GVariant *st = mutter_state(&bus);
+    if (!st) { g_strlcpy(msg, "Configuration d'écran GNOME inaccessible", n); return FALSE; }
+    guint32 serial; g_variant_get_child(st, 0, "u", &serial);
+    GVariant *monitors = g_variant_get_child_value(st, 1), *logical = g_variant_get_child_value(st, 2);
+    GVariantBuilder lb; g_variant_builder_init(&lb, G_VARIANT_TYPE("a(iiduba(ssa{sv}))"));
+    GVariantIter it; GVariant *lm;
+    g_variant_iter_init(&it, logical);
+    while ((lm = g_variant_iter_next_value(&it))) {
+        gint32 x, y; double sc; guint32 tr; gboolean pr;
+        g_variant_get_child(lm, 0, "i", &x); g_variant_get_child(lm, 1, "i", &y); g_variant_get_child(lm, 2, "d", &sc);
+        g_variant_get_child(lm, 3, "u", &tr); g_variant_get_child(lm, 4, "b", &pr);
+        GVariantBuilder mb; g_variant_builder_init(&mb, G_VARIANT_TYPE("a(ssa{sv})"));
+        GVariant *mons = g_variant_get_child_value(lm, 5); GVariantIter mi; GVariant *mon;
+        g_variant_iter_init(&mi, mons);
+        while ((mon = g_variant_iter_next_value(&mi))) {
+            const char *c; g_variant_get(mon, "(&s&s&s&s)", &c, NULL, NULL, NULL);
+            char cur[32] = "";
+            if (!strcmp(c, conn)) g_strlcpy(cur, mode_id, sizeof cur); else mutter_current_mode(monitors, c, cur, sizeof cur, NULL, NULL, NULL);
+            g_variant_builder_add(&mb, "(ss@a{sv})", c, cur, g_variant_new_array(G_VARIANT_TYPE("{sv}"), NULL, 0));
+            g_variant_unref(mon);
+        }
+        g_variant_builder_add(&lb, "(iiduba(ssa{sv}))", x, y, sc, tr, pr, &mb);
+        g_variant_unref(mons); g_variant_unref(lm);
+    }
+    GError *e = NULL;
+    GVariant *r = g_dbus_connection_call_sync(bus, "org.gnome.Mutter.DisplayConfig", "/org/gnome/Mutter/DisplayConfig", "org.gnome.Mutter.DisplayConfig",
+        "ApplyMonitorsConfig", g_variant_new("(uua(iiduba(ssa{sv}))@a{sv})", serial, 1u, &lb, g_variant_new_array(G_VARIANT_TYPE("{sv}"), NULL, 0)),
+        NULL, G_DBUS_CALL_FLAGS_NONE, 5000, NULL, &e);
+    if (r) g_variant_unref(r);
+    if (e) { g_strlcpy(msg, e->message, n); g_error_free(e); }
+    g_variant_unref(monitors); g_variant_unref(logical); g_variant_unref(st); g_object_unref(bus);
+    return r != NULL;
+}
+
 static gboolean read_display(Disp *d) {
+    memset(d, 0, sizeof *d);
+    if (read_sway(d) || read_kde(d) || read_gnome(d)) { sort_modes(d); return TRUE; }
     memset(d, 0, sizeof *d);
     if (has_cmd("hyprctl")) {
         gchar *o = cmd1("hyprctl", "monitors", "-j");
@@ -584,6 +786,11 @@ static gboolean set_refresh(int hz, char *msg, size_t n) {
         if (!msg[0]) g_strlcpy(msg, "Échec du changement de fréquence", n);
         return FALSE;
     }
+    const char *mid = NULL;
+    for (int i = 0; i < d.nmodes; i++) if (d.modes[i] == hz) mid = d.mode_ids[i];
+    if (!strcmp(d.backend, "sway")) { char *a[] = {"swaymsg", "output", d.name, "mode", (char *)mid, NULL}; return mid && *mid && run_ok(a, msg, n); }
+    if (!strcmp(d.backend, "kde")) { char o[96]; g_snprintf(o, sizeof o, "output.%s.mode.%s", d.name, mid ? mid : ""); char *a[] = {"kscreen-doctor", o, NULL}; return mid && *mid && run_ok(a, msg, n); }
+    if (!strcmp(d.backend, "gnome")) return mid && *mid && set_gnome(d.name, mid, msg, n);
     if (!strcmp(d.backend, "xrandr")) {
         char r[16]; g_snprintf(r, sizeof r, "%d", hz);
         char *a[] = {"xrandr", "--output", d.name, "--mode", mode, "--rate", r, NULL};
@@ -613,6 +820,13 @@ static gboolean set_brightness(int v, char *msg, size_t n) {
     }
     char p[220]; g_snprintf(p, sizeof p, "%s/max_brightness", backlight_dir);
     long mx = rdl(p, 100);
+    /* systemd-logind règle le rétroéclairage pour la session, sans root ni outil externe */
+    if (!sysbus) sysbus = g_bus_get_sync(G_BUS_TYPE_SYSTEM, NULL, NULL);
+    if (sysbus) {
+        GVariant *r = g_dbus_connection_call_sync(sysbus, "org.freedesktop.login1", "/org/freedesktop/login1/session/auto", "org.freedesktop.login1.Session",
+            "SetBrightness", g_variant_new("(ssu)", "backlight", strrchr(backlight_dir, '/') + 1, (guint32)lround(mx * v / 100.0)), NULL, G_DBUS_CALL_FLAGS_NONE, 2000, NULL, NULL);
+        if (r) { g_variant_unref(r); return TRUE; }
+    }
     g_snprintf(p, sizeof p, "%s/brightness", backlight_dir);
     FILE *f = fopen(p, "w");
     if (!f) { g_strlcpy(msg, "Installe brightnessctl pour régler la luminosité", n); return FALSE; }
@@ -648,10 +862,36 @@ static void read_audio(HwState *s) {
     }
 }
 
+static gboolean desktop_is(const char *name) { const char *d = g_getenv("XDG_CURRENT_DESKTOP"); return d && strstr(d, name); }
+static const char *kde_cfg(gboolean write) {
+    if (write) return has_cmd("kwriteconfig6") ? "kwriteconfig6" : has_cmd("kwriteconfig5") ? "kwriteconfig5" : NULL;
+    return has_cmd("kreadconfig6") ? "kreadconfig6" : has_cmd("kreadconfig5") ? "kreadconfig5" : NULL;
+}
+
+/* filtre lumière bleue : réglage natif du bureau (GNOME, KDE) en priorité, sinon un outil autonome */
 static const char *night_tool(void) {
-    const char *t[] = {"omarchy", "gammastep", "redshift", "wlsunset", NULL};
+    if (has_cmd("omarchy")) return "omarchy";
+    if (desktop_is("GNOME") && has_cmd("gsettings")) return "gnome";
+    if (desktop_is("KDE") && kde_cfg(TRUE)) return "kde";
+    const char *t[] = {"gammastep", "redshift", "wlsunset", NULL};
     for (int i = 0; t[i]; i++) if (has_cmd(t[i])) return t[i];
     return NULL;
+}
+
+/* état réel côté bureau (l'utilisateur peut l'avoir changé ailleurs) ; -1 si inconnu */
+static int night_read(const char *t) {
+    gchar *o = NULL;
+    if (!strcmp(t, "gnome")) {
+        char *a[] = {"gsettings", "get", "org.gnome.settings-daemon.plugins.color", "night-light-enabled", NULL};
+        o = run_out(a, NULL, 0);
+    } else if (!strcmp(t, "kde")) {
+        char *a[] = {(char *)kde_cfg(FALSE), "--file", "kwinrc", "--group", "NightColor", "--key", "Active", NULL};
+        if (!a[0]) return -1;
+        o = run_out(a, NULL, 0);
+    } else return -1;
+    int r = o ? (strstr(o, "true") != NULL) : -1;
+    g_free(o);
+    return r;
 }
 
 static GPid wlsunset_pid;
@@ -660,6 +900,14 @@ static gboolean toggle_night(gboolean on, char *msg, size_t n) {
     if (!t) { g_strlcpy(msg, "Aucun outil de filtre lumière bleue trouvé", n); return FALSE; }
     gboolean ok = TRUE;
     if (!strcmp(t, "omarchy")) { char *a[] = {"omarchy", "toggle", "nightlight", NULL}; ok = run_ok(a, msg, n); }
+    else if (!strcmp(t, "gnome")) {                        /* suit la plage horaire réglée dans GNOME */
+        char *a[] = {"gsettings", "set", "org.gnome.settings-daemon.plugins.color", "night-light-enabled", on ? "true" : "false", NULL}; ok = run_ok(a, msg, n);
+    } else if (!strcmp(t, "kde")) {
+        char *a[] = {(char *)kde_cfg(TRUE), "--file", "kwinrc", "--group", "NightColor", "--key", "Active", on ? "true" : "false", NULL};
+        ok = run_ok(a, msg, n);
+        GDBusConnection *bus = ok ? g_bus_get_sync(G_BUS_TYPE_SESSION, NULL, NULL) : NULL;   /* KWin relit sa configuration */
+        if (bus) { GVariant *r = g_dbus_connection_call_sync(bus, "org.kde.KWin", "/KWin", "org.kde.KWin", "reconfigure", NULL, NULL, G_DBUS_CALL_FLAGS_NONE, 2000, NULL, NULL); if (r) g_variant_unref(r); g_object_unref(bus); }
+    }
     else if (!strcmp(t, "wlsunset")) {
         if (wlsunset_pid) { kill(wlsunset_pid, SIGTERM); g_spawn_close_pid(wlsunset_pid); wlsunset_pid = 0; }
         if (on) { char *a[] = {"wlsunset", "-T", "3501", "-t", "3500", NULL}; ok = g_spawn_async(NULL, a, NULL, G_SPAWN_SEARCH_PATH | G_SPAWN_DO_NOT_REAP_CHILD, NULL, NULL, &wlsunset_pid, NULL); }
@@ -720,7 +968,10 @@ static gpointer sampler(gpointer unused) {
         char up[64]; W.uptime = rd("/proc/uptime", up, sizeof up) ? atof(up) : 0;
         if (slow) {
             read_profiles(&W); read_gpumode(&W); read_display(&W.disp); read_audio(&W);
-            W.night_supported = night_tool() != NULL;
+            const char *nt = night_tool();
+            W.night_supported = nt != NULL;
+            int nr = nt ? night_read(nt) : -1;
+            if (nr >= 0) g_atomic_int_set(&night_on, nr);
         }
         if (tick % 5 == 0 && has_cmd("nmcli")) {
             W.ssid[0] = 0; W.signal = 0;

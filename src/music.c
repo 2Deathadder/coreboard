@@ -1,5 +1,6 @@
 /* Coreboard — capture audio (parec) + FFT 1024 points, 4 bandes de fréquences, détection de battements */
 #include "music.h"
+#include "compat.h"
 #include <math.h>
 #include <signal.h>
 #include <string.h>
@@ -110,7 +111,7 @@ int music_beat_count(void) { g_mutex_lock(&lk); int v = beats; g_mutex_unlock(&l
 gboolean music_start(char *err, size_t n) {
     if (run) return TRUE;
     if (th) { g_thread_join(th); th = NULL; }
-    if (!g_find_program_in_path("parec")) { g_strlcpy(err, "parec introuvable (paquet libpulse / pipewire-pulse)", n); return FALSE; }
+    if (!compat_has("parec")) { g_strlcpy(err, "parec introuvable (paquet pulseaudio-utils, libpulse ou pipewire-pulse selon la distribution)", n); return FALSE; }
     const char *argv[] = {"parec", "-d", "@DEFAULT_MONITOR@", "--format=s16le", "--rate=44100", "--channels=1", "--latency-msec=15", NULL};
     gint out = -1; GError *e = NULL;
     if (!g_spawn_async_with_pipes(NULL, (char **)argv, NULL, G_SPAWN_SEARCH_PATH | G_SPAWN_DO_NOT_REAP_CHILD | G_SPAWN_STDERR_TO_DEV_NULL,

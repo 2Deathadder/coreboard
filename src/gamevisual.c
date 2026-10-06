@@ -1,5 +1,6 @@
 /* Coreboard — GameVisual : un fragment shader généré (luminosité, contraste, saturation, gamma, température) */
 #include "gamevisual.h"
+#include "compat.h"
 #include <json-glib/json-glib.h>
 #include <math.h>
 #include <stdio.h>
@@ -20,7 +21,7 @@ static GvState st = {0, 0, 1, 1, 1, 1, 6500, 0, 0};
 const char *gv_preset_name(int i) { return i >= 0 && i < GV_NPRESETS ? PRE[i].name : "Manuel"; }
 GvState *gv_state(void) { return &st; }
 
-gboolean gv_supported(void) { return g_getenv("HYPRLAND_INSTANCE_SIGNATURE") && g_find_program_in_path("hyprctl"); }
+gboolean gv_supported(void) { return g_getenv("HYPRLAND_INSTANCE_SIGNATURE") && compat_has("hyprctl"); }
 
 void gv_select_preset(int i) {
     st.preset = i;

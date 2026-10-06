@@ -9,6 +9,7 @@
 #include <glib/gstdio.h>
 #include "hw.h"
 #include "fanctl.h"
+#include "compat.h"
 
 
 /* ------------------------------------------------------------------ utilitaires */
@@ -47,7 +48,8 @@ static void save_json(const char *file, JsonBuilder *b) {
 static const char *jstr(JsonObject *o, const char *k) { return json_object_has_member(o, k) ? json_object_get_string_member(o, k) : ""; }
 
 /* ------------------------------------------------------------------ installation automatique des outils optionnels
-   (steamcmd, legendary, lgogdownloader) : ces trois-là ne sont que sur AUR (pas dans les dépôts officiels), donc
+   (steamcmd, legendary, lgogdownloader). Hors Arch : dépôts de la distribution ou version officielle téléchargée
+   dans ~/.local (compat.c). Sur Arch, ces trois-là ne sont que sur AUR (pas dans les dépôts officiels), donc
    pas de simple « pacman -S » possible. On les compile soi-même (git clone + makepkg, sans privilège requis :
    makepkg sans -s/--syncdeps n'invoque jamais sudo) puis on installe le paquet obtenu via pkexec, exactement le
    même mécanisme pkexec+pacman déjà utilisé ailleurs dans Coreboard. */
@@ -92,6 +94,20 @@ static gpointer inst_thread(gpointer d) {
     gchar *pkg = d;
     gboolean ok = FALSE;
     const char *why = "dossier temporaire impossible à créer";
+    /* hors Arch (ou sans makepkg/git) : dépôts de la distribution, sinon version officielle dans ~/.local (sans root) */
+    if (compat_pkgmgr() != PM_PACMAN || !compat_has("makepkg") || !compat_has("git")) {
+        if (compat_pkg_available(pkg)) {
+            const char *l[] = {pkg, NULL};
+            ok = compat_install_pkgs(l);
+            why = ok ? NULL : "installation refusée ou échouée";
+        } else if (!strcmp(pkg, "lgogdownloader")) {
+            why = "absent des dépôts de cette distribution";
+        } else {
+            ok = compat_install_user_tool(pkg);
+            why = ok ? NULL : "téléchargement impossible (connexion, ou curl manquant)";
+        }
+        goto done;
+    }
     const char *deps = aur_predeps(pkg);
     if (*deps) {
         gchar **dl = g_strsplit(deps, " ", -1);
@@ -136,6 +152,7 @@ static gpointer inst_thread(gpointer d) {
         run_ok(NULL, rmrf);
         g_free(dir);
     }
+  done:
     g_mutex_lock(&inst_lock); inst_busy = FALSE; inst_target[0] = 0; g_mutex_unlock(&inst_lock);
     InstDone *r = g_new0(InstDone, 1); r->pkg = pkg; r->ok = ok; r->why = why;   /* signalé à l'interface (toast) */
     g_idle_add(inst_done_idle, r);
@@ -157,48 +174,23 @@ void fx_tool_install(const char *pkg) {
     if (go) g_thread_unref(g_thread_new("coreboard-toolinst", inst_thread, g_strdup(pkg)));
 }
 
-/* ------------------------------------------------------------------ fenêtres ouvertes (Hyprland) */
+/* ------------------------------------------------------------------ fenêtres ouvertes (Hyprland, Sway, X11/XWayland : compat.c) */
 static Win wins[MAXWIN]; static int nwin; static gchar *active_cls;
-static gboolean hypr_ok = -1;
 
-gboolean fx_windows_supported(void) {
-    if (hypr_ok == (gboolean)-1) hypr_ok = g_getenv("HYPRLAND_INSTANCE_SIGNATURE") && g_find_program_in_path("hyprctl");
-    return hypr_ok;
-}
+gboolean fx_windows_supported(void) { return compat_win_backend() != WB_NONE; }
 
 void fx_windows_refresh(void) {
     if (!fx_windows_supported()) return;
-    const char *argv[] = {"hyprctl", "clients", "-j", NULL};
-    gchar *out = run_out(argv); if (!out) return;
-    JsonParser *jp = json_parser_new();
-    int n = 0;
-    if (json_parser_load_from_data(jp, out, -1, NULL) && JSON_NODE_HOLDS_ARRAY(json_parser_get_root(jp))) {
-        JsonArray *a = json_node_get_array(json_parser_get_root(jp));
-        for (guint i = 0; i < json_array_get_length(a) && n < MAXWIN; i++) {
-            JsonObject *o = json_array_get_object_element(a, i);
-            const char *c = jstr(o, "class");
-            if (!*c || !strcmp(c, "dev.coreboard.Coreboard")) continue;
-            gboolean dup = FALSE; for (int j = 0; j < n; j++) dup |= !strcmp(wins[j].cls, c);
-            if (dup) continue;
-            g_strlcpy(wins[n].cls, c, sizeof wins[n].cls); g_strlcpy(wins[n].title, jstr(o, "title"), sizeof wins[n].title);
-            wins[n].pid = (int)json_object_get_int_member(o, "pid"); n++;
-        }
+    CWin cw[MAXWIN]; int n = compat_windows(cw, MAXWIN);
+    for (int i = 0; i < n; i++) {
+        g_strlcpy(wins[i].cls, cw[i].cls, sizeof wins[i].cls); g_strlcpy(wins[i].title, cw[i].title, sizeof wins[i].title); wins[i].pid = cw[i].pid;
     }
-    nwin = n; g_object_unref(jp); g_free(out);
+    nwin = n;
 }
 
 int fx_windows(Win *out, int max) { int n = MIN(nwin, max); memcpy(out, wins, n * sizeof(Win)); return n; }
 
-static void active_class_refresh(void) {
-    const char *argv[] = {"hyprctl", "activewindow", "-j", NULL};
-    gchar *out = run_out(argv);
-    g_free(active_cls); active_cls = NULL;
-    if (!out) return;
-    JsonParser *jp = json_parser_new();
-    if (json_parser_load_from_data(jp, out, -1, NULL) && JSON_NODE_HOLDS_OBJECT(json_parser_get_root(jp)))
-        active_cls = g_strdup(jstr(json_node_get_object(json_parser_get_root(jp)), "class"));
-    g_object_unref(jp); g_free(out);
-}
+static void active_class_refresh(void) { g_free(active_cls); active_cls = compat_active_class(); }
 
 /* ------------------------------------------------------------------ scénarios */
 static Scenario sc[MAXSC]; static int nsc;
@@ -340,7 +332,7 @@ static void scan_steam(void) {
 
 /* Epic Games installées via Legendary (lanceur libre officieux, gère l'authentification lui-même) */
 static void scan_legendary(void) {
-    if (!g_find_program_in_path("legendary")) return;
+    if (!compat_has("legendary")) return;
     gchar *p = g_build_filename(g_get_home_dir(), ".config/legendary/installed.json", NULL);
     gchar *txt = NULL;
     if (g_file_get_contents(p, &txt, NULL, NULL)) {
@@ -411,7 +403,7 @@ static void scan_gog_heroic(void) {
 /* bibliothèque Lutris (agrégateur GOG/Epic/Origin/… par Wine) : lecture directe de sa base pga.db */
 static void scan_lutris(void) {
     gchar *db = g_build_filename(g_get_home_dir(), ".local/share/lutris/pga.db", NULL);
-    if (!g_file_test(db, G_FILE_TEST_EXISTS) || !g_find_program_in_path("sqlite3") || !g_find_program_in_path("lutris")) { g_free(db); return; }
+    if (!g_file_test(db, G_FILE_TEST_EXISTS) || !compat_has("sqlite3") || !compat_has("lutris")) { g_free(db); return; }
     const char *argv[] = {"sqlite3", "-noheader", "-separator", "\t", db, "SELECT slug,name FROM games WHERE installed=1;", NULL};
     gchar *out = run_out(argv);
     g_free(db);
@@ -724,7 +716,7 @@ static gpointer steamfree_thread(gpointer d) {
 gboolean fx_steamfree_ready(void) { g_mutex_lock(&sf_lock); gboolean r = sf_ready; g_mutex_unlock(&sf_lock); return r; }
 
 void fx_steamfree_refresh(void) {
-    if (!g_find_program_in_path("curl")) return;
+    if (!compat_has("curl")) return;
     g_mutex_lock(&sf_lock);
     gboolean go = !sf_busy; sf_busy = TRUE;
     g_mutex_unlock(&sf_lock);
@@ -779,7 +771,7 @@ static gpointer steamsearch_thread(gpointer d) {
 }
 
 void fx_steamsearch_query(const char *q) {
-    if (!q || !*q || !g_find_program_in_path("curl")) return;
+    if (!q || !*q || !compat_has("curl")) return;
     g_mutex_lock(&ss_lock);
     g_strlcpy(ss_query, q, sizeof ss_query);
     gboolean go = !ss_busy; ss_busy = TRUE;
@@ -809,7 +801,7 @@ static ScmStatus scm_status;
 static FILE *scm_in;
 static char scm_user[64];
 
-gboolean fx_steam_available(void) { return g_find_program_in_path("steamcmd") != NULL; }
+gboolean fx_steam_available(void) { return compat_has("steamcmd"); }
 
 static gboolean scm_write(const char *fmt, ...) {
     g_mutex_lock(&scm_write_lock);
@@ -964,7 +956,7 @@ void fx_steam_download(gint64 appid, const char *name) {
 static GMutex epdl_lock; static EpicStatus ep_status;   /* connexion en cours + téléchargement en cours */
 static GMutex ep_lock; static EpicLibEntry ep_cache[MAXEPIC]; static int ep_n; static gboolean ep_busy, ep_ready;
 
-gboolean fx_epic_available(void) { return g_find_program_in_path("legendary") != NULL; }
+gboolean fx_epic_available(void) { return compat_has("legendary"); }
 
 gboolean fx_epic_logged_in(void) {
     gchar *p = g_build_filename(g_get_home_dir(), ".config/legendary/user.json", NULL);
@@ -1108,7 +1100,7 @@ void fx_epic_download(const char *appname, const char *title) {
    y compris les jeux obtenus gratuitement sur le site GOG. */
 static GMutex gog_lock; static GogLibEntry gog_cache[MAXGOGLIB]; static int gog_n; static gboolean gog_busy;
 
-gboolean fx_gog_available(void) { return g_find_program_in_path("lgogdownloader") != NULL; }
+gboolean fx_gog_available(void) { return compat_has("lgogdownloader"); }
 
 static int goglib_cmp(const void *a, const void *b) { return g_ascii_strcasecmp(((const GogLibEntry *)a)->title, ((const GogLibEntry *)b)->title); }
 

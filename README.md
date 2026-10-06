@@ -6,8 +6,10 @@ Il détecte ce que ton PC expose réellement et **masque** ce qui n'existe pas.
 
 ## Compilation / installation
 
-Dépendances : `gcc`, `make`, `pkg-config`, `gtk4`, `json-glib`, `fontconfig` (paquets `-dev`/`-devel` selon la distribution).
+Dépendances : `gcc`, `make`, `pkg-config`, GTK ≥ 4.10, json-glib ≥ 1.6, `fontconfig`, `python3`, `curl`
+(Arch et dérivées, Ubuntu 24.04+, Debian 13+, Fedora 38+, openSUSE Tumbleweed). `make deps` les installe pour la distribution détectée.
 
+    make deps            # dépendances de compilation (pacman, apt, dnf ou zypper)
     make                 # compile
     make install         # ~/.local (PREFIX=/usr/local pour un autre préfixe)
     make uninstall
@@ -21,18 +23,41 @@ Dépendances : `gcc`, `make`, `pkg-config`, `gtk4`, `json-glib`, `fontconfig` (p
 
 | Fonction | Sources |
 |---|---|
-| Profils d'alimentation | power-profiles-daemon (D-Bus), sinon ACPI `platform_profile` |
+| Profils d'alimentation | power-profiles-daemon ou tuned-ppd (D-Bus), sinon ACPI `platform_profile` |
 | CPU | Intel (`coretemp`, `intel_pstate`) et AMD (`k10temp`, `amd_pstate`) : Turbo/Boost, EPP, gouverneur |
 | GPU | NVIDIA (NVML chargée dynamiquement, sans réveiller un dGPU endormi), AMD et Intel (DRM/sysfs) |
 | Mode GPU hybride | `supergfxctl`, `envycontrol` |
-| Écran (fréquence) | `hyprctl` (Hyprland), `xrandr` (X11), `wlr-randr` (wlroots) |
-| Luminosité | `/sys/class/backlight` via `brightnessctl` |
+| Écran (fréquence) | Hyprland, Sway (`swaymsg`), KDE Plasma (`kscreen-doctor`), GNOME (D-Bus Mutter), X11 (`xrandr`), wlroots (`wlr-randr`) |
+| Luminosité | `/sys/class/backlight` via `brightnessctl`, sinon systemd-logind (sans root) |
 | Audio | `pactl` (PulseAudio/PipeWire) ou `wpctl` |
-| Filtre lumière bleue | `omarchy`, `gammastep`, `redshift`, `wlsunset` |
+| Filtre lumière bleue | Omarchy, GNOME, KDE Plasma (réglage natif), sinon `gammastep`, `redshift`, `wlsunset` |
 | Ventilateurs / températures | hwmon (lecture seule) |
 | Batterie / disque / réseau | sysfs, `nmcli` |
 
 Les écritures root (Turbo, EPP, gouverneur, profil ACPI, envycontrol) passent par `pkexec` (polkit).
+
+## Compatibilité
+
+| | Hyprland | Sway | KDE Plasma | GNOME | X11 (autres) |
+|---|---|---|---|---|---|
+| Matériel, profils, CPU/GPU, audio, luminosité | ✓ | ✓ | ✓ | ✓ | ✓ |
+| Fréquence d'écran | ✓ | ✓ | ✓ | ✓ | ✓ (`xrandr`) |
+| Filtre lumière bleue | outil autonome | outil autonome | ✓ natif | ✓ natif | outil autonome |
+| Scénarios / fenêtre active | ✓ | ✓ | XWayland (`xprop`) | XWayland (`xprop`) | ✓ (`xprop`) |
+| Macros : rejeu | `wtype` | `wtype` | `ydotool` | `ydotool` | `xdotool` |
+| Macros : raccourci global | automatique | commande copiée | commande copiée | commande copiée | commande copiée |
+| GameVisual (filtre d'écran) | ✓ | — | — | — | — |
+
+Sous GNOME/KDE en Wayland, les jeux Proton/Wine tournent en XWayland : ils sont donc détectés par les scénarios.
+Hors Hyprland, « Raccourci » copie la commande `coreboard --macro "Nom"` à coller dans les raccourcis personnalisés du bureau.
+
+Installations depuis l'interface : paquets de la distribution via `pkexec` (pacman, apt, dnf, zypper), un paquet absent
+des dépôts n'empêchant pas les autres. Ce qui n'est pas dans les dépôts est téléchargé en version officielle dans
+`~/.local` sans root : umu-launcher (zipapp), legendary (binaire), steamcmd (archive Valve). Sur Arch, steamcmd,
+legendary et lgogdownloader sont compilés depuis l'AUR.
+
+Matériel : CPU Intel, AMD et ARM ; GPU NVIDIA, AMD et Intel. L'éclairage RGB (MSI MysticLight) et le refroidissement
+adaptatif (MSI Katana, firmware vérifié avant toute écriture) ne s'affichent que sur le matériel concerné.
 
 ## Fonctionnalités type Armoury Crate
 
@@ -51,7 +76,7 @@ Les écritures root (Turbo, EPP, gouverneur, profil ACPI, envycontrol) passent p
   **Analyse d'exécutable (C, `src/pe.c`)** : à l'ajout, Coreboard lit l'en-tête PE du `.exe` (architecture, table d'imports, chaînes, fichiers voisins) et affiche sur la carte : 32/64 bits, API graphique (DirectX 9/10/11/12, Vulkan), moteur (Unreal, Unity…), DLSS/NVAPI, .NET, et l'anti-triche détecté. Un anti-triche noyau (Vanguard, Ricochet…) ou un exécutable ARM64 demande une confirmation avant le lancement. En ligne de commande : `coreboard --inspect JEU.exe`.
   **Amélioration des performances et du rendu** : préréglages par jeu (Performance, Équilibré, Qualité, Économie) et réglages fins — ntsync, compilation de shaders asynchrone, faible latence, filtrage anisotrope 16x, DLSS avec mise à jour automatique, ray tracing, mise à l'échelle FSR, limiteur d'images (DXVK et MangoHud), caches de shaders persistants par jeu. Un **diagnostic système** signale ce qui limite les jeux (module ntsync, `vm.max_map_count`, limite de fichiers, groupe `gamemode`, alimentation, espace disque) et « Optimiser le système » applique les corrections en une demande de mot de passe. GameVisual ajoute netteté et vibrance à l'écran entier.
   **DLSS** : détection du GPU et de ses capacités (Super Resolution, Ray Reconstruction, Frame Generation 2x à partir de la série 40, Multi Frame Generation et DLSS 5 sur la série 50), versions DLSS présentes dans le dossier de chaque jeu (lecture des ressources de version des DLL `nvngx_dlss*.dll`), forçage du modèle Super Resolution (dernier, J, K, L, M), Frame Generation, Ray Reconstruction et indicateur à l'écran via dxvk-nvapi. **DLSS 5** : NVIDIA ne le propose pour l'instant que sur RTX 50 (RTX 40 « prévue »), et sous Linux seule une couche tierce expérimentale (DLSS5VKLayer) existe ; Coreboard affiche donc son statut réel sans l'activer artificiellement.
-  Composants : `umu-launcher gamemode lib32-gamemode mangohud lib32-mangohud lib32-vulkan-icd-loader` (bouton « Installer les composants manquants », via pkexec) ; Proton-GE se télécharge depuis l'interface (téléchargement reprenable, aussi `coreboard --install-proton`). **Limite** : les jeux à anti-triche noyau (Warzone, Valorant, Fortnite…) ne fonctionnent pas sous Linux.
+  Composants : umu-launcher, GameMode, MangoHud et Vulkan 32 bits (bouton « Installer les composants manquants », paquets de la distribution via pkexec, umu-launcher officiel dans `~/.local` s'il n'est pas dans les dépôts) ; Proton-GE se télécharge depuis l'interface (téléchargement reprenable, aussi `coreboard --install-proton`). **Limite** : les jeux à anti-triche noyau (Warzone, Valorant, Fortnite…) ne fonctionnent pas sous Linux.
 
 ## Raccourcis
 
@@ -59,6 +84,10 @@ La touche dédiée F7 (sans Fn, signal `XF86Tools`) et `SUPER + ALT + R` ouvrent
 
     o.bind("XF86Tools", "Coreboard", "coreboard --toggle")
     o.bind("SUPER + ALT + R", "Coreboard", "coreboard --toggle")
+
+Autres bureaux : ajoute un raccourci personnalisé avec la commande `coreboard --toggle`
+(GNOME : Paramètres → Clavier → Raccourcis personnalisés ; KDE : Configuration → Raccourcis → Ajouter une commande ;
+Sway : `bindsym $mod+Alt+r exec coreboard --toggle`).
 
 ## Photo de l'appareil
 

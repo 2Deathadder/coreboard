@@ -1,5 +1,6 @@
 /* Coreboard — adaptateur Windows (Proton-GE via umu-launcher) */
 #include "winrun.h"
+#include "compat.h"
 #include "pe.h"
 #include "dlss.h"
 #include "fanctl.h"
@@ -208,7 +209,7 @@ static gboolean proton_installed(void) {
 }
 
 WgTools wg_tools(void) {
-    WgTools t = {g_find_program_in_path("umu-run") != NULL, proton_installed(), g_find_program_in_path("gamemoderun") != NULL, g_find_program_in_path("mangohud") != NULL};
+    WgTools t = {compat_has("umu-run"), proton_installed(), compat_has("gamemoderun"), compat_has("mangohud")};
     return t;
 }
 
@@ -218,15 +219,18 @@ gboolean wg_installing(void) { return installing; }
 static gboolean inst_finish(gpointer p) { gboolean ok = GPOINTER_TO_INT(p); installing = FALSE; if (inst_done) inst_done(ok, inst_data); return G_SOURCE_REMOVE; }
 static gpointer inst_thread(gpointer d) {
     (void)d;
-    const char *argv[] = {"pkexec", "pacman", "-S", "--needed", "--noconfirm", "umu-launcher", "gamemode", "lib32-gamemode", "mangohud", "lib32-mangohud", "lib32-vulkan-icd-loader", NULL};
-    gint st = 1; g_spawn_sync(NULL, (char **)argv, NULL, G_SPAWN_SEARCH_PATH | G_SPAWN_STDOUT_TO_DEV_NULL | G_SPAWN_STDERR_TO_DEV_NULL, NULL, NULL, NULL, NULL, &st, NULL);
-    g_idle_add(inst_finish, GINT_TO_POINTER(st == 0));
+    /* paquets de la distribution (une seule demande de mot de passe), puis umu-launcher officiel dans ~/.local
+       s'il n'est pas dans ses dépôts (Debian, Ubuntu, openSUSE…) */
+    const char *pk[] = {"umu-launcher", "gamemode", "gamemode32", "mangohud", "mangohud32", "vulkan32", NULL};
+    compat_install_pkgs(pk);
+    if (!compat_has("umu-run")) compat_install_user_tool("umu-run");
+    g_idle_add(inst_finish, GINT_TO_POINTER(compat_has("umu-run")));
     return NULL;
 }
 void wg_install_deps(void (*done)(gboolean, gpointer), gpointer d) {
     if (installing) return;
     installing = TRUE; inst_done = done; inst_data = d;
-    g_thread_unref(g_thread_new("coreboard-pacman", inst_thread, NULL));
+    g_thread_unref(g_thread_new("coreboard-deps", inst_thread, NULL));
 }
 
 /* ------------------------------------------------------------------ lancement */
@@ -248,7 +252,7 @@ void wg_launch(int i) {
     fan_game_begin();
     WinGame *w = &wg[i];
     if (!g_file_test(w->exe, G_FILE_TEST_EXISTS)) { g_strlcpy(w->status, "Exécutable introuvable", sizeof w->status); return; }
-    if (!g_find_program_in_path("umu-run")) { g_strlcpy(w->status, "umu-launcher n'est pas installé", sizeof w->status); return; }
+    if (!compat_has("umu-run")) { g_strlcpy(w->status, "umu-launcher n'est pas installé", sizeof w->status); return; }
     g_mkdir_with_parents(w->prefix, 0755);
     char logp[600]; wg_log_path(i, logp, sizeof logp);
 
@@ -293,7 +297,7 @@ void wg_launch(int i) {
       if (dc->len) env = g_environ_setenv(env, "DXVK_CONFIG", dc->str, TRUE);
       g_string_free(dc, TRUE); }
     if (w->lowlat) env = g_environ_setenv(env, "__GL_MaxFramesAllowed", "1", TRUE);
-    gboolean use_hud = (w->hud || w->fps_cap > 0) && g_find_program_in_path("mangohud");
+    gboolean use_hud = (w->hud || w->fps_cap > 0) && compat_has("mangohud");
     if (w->fps_cap > 0) { char fr[16]; g_snprintf(fr, sizeof fr, "%d", w->fps_cap); env = g_environ_setenv(env, "DXVK_FRAME_RATE", fr, TRUE); }
     if (use_hud) {                                                          /* MangoHud : limiteur d'images (DirectX 12 compris) et/ou affichage */
       GString *mg = g_string_new(w->hud ? "fps,frametime,frame_timing,gpu_stats,gpu_temp,cpu_stats,ram,vram,gpu_power" : "no_display");
@@ -303,7 +307,7 @@ void wg_launch(int i) {
 
     GPtrArray *a = g_ptr_array_new_with_free_func(g_free);
     g_ptr_array_add(a, g_strdup("sh")); g_ptr_array_add(a, g_strdup("-c")); g_ptr_array_add(a, g_strdup("exec \"$@\" >>\"$CB_LOG\" 2>&1")); g_ptr_array_add(a, g_strdup("sh"));
-    if (w->gamemode && g_find_program_in_path("gamemoderun")) g_ptr_array_add(a, g_strdup("gamemoderun"));
+    if (w->gamemode && compat_has("gamemoderun")) g_ptr_array_add(a, g_strdup("gamemoderun"));
     if (use_hud) g_ptr_array_add(a, g_strdup("mangohud"));
     g_ptr_array_add(a, g_strdup("umu-run")); g_ptr_array_add(a, g_strdup(w->exe));
     if (w->args[0]) { gchar **av; gint ac; if (g_shell_parse_argv(w->args, &ac, &av, NULL)) { for (int k = 0; k < ac; k++) g_ptr_array_add(a, g_strdup(av[k])); g_strfreev(av); } }

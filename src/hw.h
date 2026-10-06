@@ -8,7 +8,7 @@
 #define MAXCH 8
 
 typedef struct { char label[40]; int rpm; } Fan;
-typedef struct { char backend[16], name[40]; int w, h, hz, modes[16], nmodes, x, y; double scale; } Disp;
+typedef struct { char backend[16], name[40]; int w, h, hz, modes[16], nmodes, x, y; double scale; char mode_ids[16][32]; } Disp;   /* mode_ids : identifiant du mode par fréquence (KDE, GNOME, Sway) */
 
 typedef struct {
     /* appareil */

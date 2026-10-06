@@ -1,5 +1,6 @@
 /* Coreboard — macros clavier */
 #include "macros.h"
+#include "compat.h"
 #include <json-glib/json-glib.h>
 #include <stdio.h>
 #include <string.h>
@@ -17,7 +18,7 @@ static char *cfg(const char *dir, const char *f) {
 Macro *mx_list(int *n) { *n = nmx; return mx; }
 gboolean mx_recording(void) { return rec >= 0; }
 int mx_rec_index(void) { return rec; }
-gboolean mx_wtype_available(void) { return g_find_program_in_path("wtype") != NULL; }
+gboolean mx_wtype_available(void) { return compat_input() != IB_NONE; }   /* wtype, xdotool ou ydotool */
 
 /* échappement Lua : seuls \ et " (l'UTF-8 passe tel quel ; g_strescape produirait des séquences octales invalides en Lua) */
 static gchar *lua_escape(const char *s) {
@@ -28,11 +29,16 @@ static gchar *lua_escape(const char *s) {
 
 /* ------------------------------------------------------------------ raccourcis Hyprland (fichier chargé par bindings.lua) */
 static void write_binds(void) {
+    /* raccourcis globaux écrits pour Hyprland seulement ; ailleurs l'utilisateur les déclare dans les réglages du bureau */
+    gchar *hd = g_build_filename(g_get_user_config_dir(), "hypr", NULL);
+    gboolean hypr = g_file_test(hd, G_FILE_TEST_IS_DIR); g_free(hd);
+    if (!hypr) return;
     GString *g = g_string_new("-- Généré par Coreboard (macros) : ne pas modifier à la main.\n");
     gchar *self = g_file_read_link("/proc/self/exe", NULL);
     for (int i = 0; i < nmx; i++) {
         if (!mx[i].bind[0]) continue;
-        gchar *cmd = g_strdup_printf("%s --macro %s", self ? self : "coreboard", g_shell_quote(mx[i].name));
+        gchar *qn = g_shell_quote(mx[i].name), *cmd = g_strdup_printf("%s --macro %s", self ? self : "coreboard", qn);
+        g_free(qn);
         gchar *esc = lua_escape(cmd), *desc = lua_escape(mx[i].name);
         g_string_append_printf(g, "hl.bind(\"%s\", hl.dsp.exec_cmd(\"%s\"), { description = \"Macro : %s\" })\n", mx[i].bind, esc, desc);
         g_free(esc); g_free(desc); g_free(cmd);
@@ -171,23 +177,15 @@ const char *mx_step_label(const MacroStep *s, char *buf, size_t n) {
 }
 
 /* ------------------------------------------------------------------ rejeu */
-static void run_wtype(const char *const *argv) { g_spawn_sync(NULL, (char **)argv, NULL, G_SPAWN_SEARCH_PATH | G_SPAWN_STDOUT_TO_DEV_NULL | G_SPAWN_STDERR_TO_DEV_NULL, NULL, NULL, NULL, NULL, NULL, NULL); }
+static void run_cmd(const char *const *argv) { g_spawn_sync(NULL, (char **)argv, NULL, G_SPAWN_SEARCH_PATH | G_SPAWN_STDOUT_TO_DEV_NULL | G_SPAWN_STDERR_TO_DEV_NULL, NULL, NULL, NULL, NULL, NULL, NULL); }
 
+/* saisie simulée via compat.c : wtype (wlroots), xdotool (X11), ydotool (tout bureau, démon ydotoold) */
 static void play_step(const MacroStep *s) {
     switch (s->type) {
     case MS_DELAY: g_usleep((gulong)CLAMP(atoi(s->value), 0, 60000) * 1000); break;
-    case MS_TEXT: { const char *a[] = {"wtype", "--", s->value, NULL}; run_wtype(a); break; }
-    case MS_CMD: { const char *a[] = {"sh", "-c", s->value, NULL}; run_wtype(a); break; }
-    default: {                                                   /* « ctrl+shift+Return » → wtype -M ctrl -M shift -k Return -m shift -m ctrl */
-        gchar **parts = g_strsplit(s->value, "+", -1); int n = g_strv_length(parts);
-        GPtrArray *a = g_ptr_array_new(); g_ptr_array_add(a, (gpointer)"wtype");
-        for (int i = 0; i < n - 1; i++) { g_ptr_array_add(a, (gpointer)"-M"); g_ptr_array_add(a, parts[i]); }
-        g_ptr_array_add(a, (gpointer)"-k"); g_ptr_array_add(a, parts[n - 1]);
-        for (int i = n - 2; i >= 0; i--) { g_ptr_array_add(a, (gpointer)"-m"); g_ptr_array_add(a, parts[i]); }
-        g_ptr_array_add(a, NULL);
-        run_wtype((const char *const *)a->pdata);
-        g_ptr_array_free(a, TRUE); g_strfreev(parts);
-    }
+    case MS_TEXT: compat_type_text(s->value); break;
+    case MS_CMD: { const char *a[] = {"sh", "-c", s->value, NULL}; run_cmd(a); break; }
+    default: compat_key_combo(s->value);
     }
 }
 

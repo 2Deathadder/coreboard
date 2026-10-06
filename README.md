@@ -103,3 +103,7 @@ Pour en ajouter une, prends n'importe quelle image (idéalement sur fond blanc) 
     o.bind("SUPER + ALT + R", "Coreboard", "coreboard --toggle")
 
 Polices embarquées : Orbitron et Rajdhani (licence SIL OFL).
+
+## Licence
+
+GPL-3.0-or-later (voir `LICENSE`). Polices Orbitron et Rajdhani : SIL OFL. Sous-module `fistgirl` : MIT.

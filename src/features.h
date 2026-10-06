@@ -34,6 +34,7 @@ void fx_init(void);
 gboolean fx_tool_installing(void);
 const char *fx_tool_installing_name(void);   /* nom du paquet en cours d'installation ("" si aucun) */
 void fx_tool_install(const char *pkg);
+void fx_tool_install_set_done(void (*cb)(const char *pkg, gboolean ok, const char *why));   /* appelé dans le thread principal */
 
 /* scénarios */
 Scenario *fx_scenarios(int *n);

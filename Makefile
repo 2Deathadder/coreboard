@@ -21,12 +21,12 @@ test: tests/hwtest.c src/hw.c src/hw.h
 install: coreboard
 	# ne supprime que les fichiers installés : ce dossier contient aussi les données utilisateur (préfixes Wine, journaux, téléchargements)
 	rm -rf $(PREFIX)/share/coreboard/fonts $(PREFIX)/share/coreboard/devices
+	rm -f $(PREFIX)/share/coreboard/coreboard-fand   # ancien emplacement du démon root (modifiable par l'utilisateur)
 	install -Dm755 coreboard $(PREFIX)/bin/coreboard
 	install -Dm644 data/fonts/Orbitron.ttf $(PREFIX)/share/coreboard/fonts/Orbitron.ttf
 	install -Dm644 data/fonts/Rajdhani-Medium.ttf $(PREFIX)/share/coreboard/fonts/Rajdhani-Medium.ttf
 	install -Dm644 data/fonts/Rajdhani-Bold.ttf $(PREFIX)/share/coreboard/fonts/Rajdhani-Bold.ttf
 	-install -Dm644 data/devices/*.png -t $(PREFIX)/share/coreboard/devices
-	install -Dm755 data/coreboard-fand $(PREFIX)/share/coreboard/coreboard-fand
 	install -Dm644 data/sounds/startup.ogg $(PREFIX)/share/coreboard/sounds/startup.ogg
 	install -Dm755 data/fistgirl_helper.py $(PREFIX)/share/coreboard/fistgirl_helper.py
 	-install -Dm755 fistgirl/add-on/get_ff_link.py $(PREFIX)/share/coreboard/get_ff_link.py
@@ -52,3 +52,14 @@ install-udev:
 	udevadm trigger --subsystem-match=hidraw --action=change
 
 .PHONY: install-udev
+
+# démon root de refroidissement : installé hors du dossier utilisateur, propriété de root (à lancer avec sudo)
+FAND_DIR ?= /usr/local/libexec/coreboard
+install-fand:
+	install -o root -g root -Dm755 data/coreboard-fand $(FAND_DIR)/coreboard-fand
+
+uninstall-fand:
+	rm -f $(FAND_DIR)/coreboard-fand
+	-rmdir $(FAND_DIR) 2>/dev/null
+
+.PHONY: install-fand uninstall-fand

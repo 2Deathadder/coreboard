@@ -724,7 +724,7 @@ static gpointer sampler(gpointer unused) {
         }
         if (tick % 5 == 0 && has_cmd("nmcli")) {
             W.ssid[0] = 0; W.signal = 0;
-            char *a[] = {"nmcli", "-t", "-f", "ACTIVE,SSID,SIGNAL", "dev", "wifi", NULL};
+            char *a[] = {"nmcli", "-t", "-f", "ACTIVE,SSID,SIGNAL", "dev", "wifi", "list", "--rescan", "no", NULL};
             gchar *w = run_out(a, NULL, 0);
             if (w) {
                 gchar **ln = g_strsplit(w, "\n", -1);

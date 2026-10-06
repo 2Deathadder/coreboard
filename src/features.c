@@ -5,6 +5,7 @@
 #include <stdio.h>
 #include <stdarg.h>
 #include <string.h>
+#include <unistd.h>
 #include <glib/gstdio.h>
 #include "hw.h"
 #include "fanctl.h"
@@ -51,6 +52,16 @@ static const char *jstr(JsonObject *o, const char *k) { return json_object_has_m
    makepkg sans -s/--syncdeps n'invoque jamais sudo) puis on installe le paquet obtenu via pkexec, exactement le
    même mécanisme pkexec+pacman déjà utilisé ailleurs dans Coreboard. */
 static GMutex inst_lock; static gboolean inst_busy; static char inst_target[32];
+static void (*inst_done_cb)(const char *pkg, gboolean ok, const char *why);
+
+typedef struct { gchar *pkg; gboolean ok; const char *why; } InstDone;
+static gboolean inst_done_idle(gpointer p) {
+    InstDone *r = p;
+    if (inst_done_cb) inst_done_cb(r->pkg, r->ok, r->why);
+    g_free(r->pkg); g_free(r);
+    return G_SOURCE_REMOVE;
+}
+void fx_tool_install_set_done(void (*cb)(const char *pkg, gboolean ok, const char *why)) { inst_done_cb = cb; }
 
 static gboolean run_ok(const char *cwd, const char *const *argv) {
     gint st = 1;
@@ -80,6 +91,7 @@ static const char *aur_predeps(const char *pkg) {
 static gpointer inst_thread(gpointer d) {
     gchar *pkg = d;
     gboolean ok = FALSE;
+    const char *why = "dossier temporaire impossible à créer";
     const char *deps = aur_predeps(pkg);
     if (*deps) {
         gchar **dl = g_strsplit(deps, " ", -1);
@@ -96,7 +108,9 @@ static gpointer inst_thread(gpointer d) {
     if (dir) {
         gchar *url = g_strdup_printf("https://aur.archlinux.org/%s.git", pkg);
         const char *clone[] = {"git", "clone", "--depth", "1", url, dir, NULL};
+        why = "téléchargement depuis AUR impossible";
         if (run_ok_retry(NULL, clone, 3)) {
+            why = "compilation échouée (dépendances manquantes ?)";
             const char *build[] = {"makepkg", "--noconfirm", "--needed", "--skippgpcheck", NULL};
             if (run_ok(dir, build)) {
                 const char *list[] = {"makepkg", "--packagelist", NULL};
@@ -106,9 +120,11 @@ static gpointer inst_thread(gpointer d) {
                     gchar **lines = g_strsplit(out, "\n", -1);
                     const char *pkgpath = NULL;
                     for (int i = 0; lines[i] && !pkgpath; i++) if (*lines[i] && !strstr(lines[i], "-debug-")) pkgpath = lines[i];
+                    why = "paquet compilé introuvable";
                     if (pkgpath) {
                         const char *inst[] = {"pkexec", "pacman", "-U", "--noconfirm", pkgpath, NULL};
                         ok = run_ok_retry(NULL, inst, 3);
+                        why = ok ? NULL : "installation refusée ou échouée";
                     }
                     g_strfreev(lines);
                 }
@@ -120,14 +136,18 @@ static gpointer inst_thread(gpointer d) {
         run_ok(NULL, rmrf);
         g_free(dir);
     }
-    g_mutex_lock(&inst_lock); inst_busy = FALSE; g_mutex_unlock(&inst_lock);
-    (void)ok;   /* échec = le bouton d'installation réapparaît simplement (outil toujours absent) */
-    g_free(pkg);
+    g_mutex_lock(&inst_lock); inst_busy = FALSE; inst_target[0] = 0; g_mutex_unlock(&inst_lock);
+    InstDone *r = g_new0(InstDone, 1); r->pkg = pkg; r->ok = ok; r->why = why;   /* signalé à l'interface (toast) */
+    g_idle_add(inst_done_idle, r);
     return NULL;
 }
 
 gboolean fx_tool_installing(void) { g_mutex_lock(&inst_lock); gboolean b = inst_busy; g_mutex_unlock(&inst_lock); return b; }
-const char *fx_tool_installing_name(void) { return inst_target; }
+const char *fx_tool_installing_name(void) {          /* thread principal uniquement */
+    static char t[32];
+    g_mutex_lock(&inst_lock); g_strlcpy(t, inst_target, sizeof t); g_mutex_unlock(&inst_lock);
+    return t;
+}
 
 void fx_tool_install(const char *pkg) {
     g_mutex_lock(&inst_lock);
@@ -495,18 +515,17 @@ Game *fx_games(int *n) { *n = ngames; return games; }
 void fx_game_launch(const Game *g) {
     fan_game_begin();
     if (g->app) { g_app_info_launch(g->app, NULL, NULL, NULL); return; }
-    if (!strcmp(g->source, "Steam")) {
-        gchar *cmd = g_strdup_printf("steam steam://rungameid/%s", g->id);
-        g_spawn_command_line_async(cmd, NULL); g_free(cmd);
-    } else if (!strcmp(g->source, "Epic")) {
-        gchar *cmd = g_strdup_printf("legendary launch %s", g->id);
-        g_spawn_command_line_async(cmd, NULL); g_free(cmd);
-    } else if (!strcmp(g->source, "GOG")) {
-        gchar *cmd = g_strdup_printf("xdg-open heroic://launch/gog/%s", g->id);
-        g_spawn_command_line_async(cmd, NULL); g_free(cmd);
-    } else if (!strcmp(g->source, "Lutris")) {
-        gchar *cmd = g_strdup_printf("lutris lutris:rungame/%s", g->id);
-        g_spawn_command_line_async(cmd, NULL); g_free(cmd);
+    /* argv explicite : un identifiant contenant espaces ou guillemets ne peut pas être découpé en plusieurs arguments */
+    gchar *uri = NULL; const char *prog = NULL, *sub = NULL;
+    if (!strcmp(g->source, "Steam")) { prog = "steam"; uri = g_strdup_printf("steam://rungameid/%s", g->id); }
+    else if (!strcmp(g->source, "Epic")) { prog = "legendary"; sub = "launch"; uri = g_strdup(g->id); }
+    else if (!strcmp(g->source, "GOG")) { prog = "xdg-open"; uri = g_strdup_printf("heroic://launch/gog/%s", g->id); }
+    else if (!strcmp(g->source, "Lutris")) { prog = "lutris"; uri = g_strdup_printf("lutris:rungame/%s", g->id); }
+    if (prog) {
+        const char *argv[] = {prog, sub ? sub : uri, sub ? uri : NULL, NULL};
+        g_spawn_async(NULL, (char **)argv, NULL, G_SPAWN_SEARCH_PATH | G_SPAWN_STDOUT_TO_DEV_NULL | G_SPAWN_STDERR_TO_DEV_NULL, NULL, NULL, NULL, NULL);
+        g_free(uri);
+        return;
     } else if (g->command[0]) {
         const char *argv[] = {"sh", "-c", g->command, NULL};
         g_spawn_async(NULL, (char **)argv, NULL, G_SPAWN_SEARCH_PATH | G_SPAWN_STDOUT_TO_DEV_NULL | G_SPAWN_STDERR_TO_DEV_NULL, NULL, NULL, NULL, NULL);
@@ -831,7 +850,7 @@ static gpointer scm_job_thread(gpointer d) {
     FILE *out = fdopen(out_fd, "r");
     gboolean awaiting_login = FALSE;
     char line[512];
-    while (fgets(line, sizeof line, out)) {
+    while (out && fgets(line, sizeof line, out)) {
         g_strchomp(line);
         if (!*line) continue;
         g_mutex_lock(&scm_lock);
@@ -861,7 +880,7 @@ static gpointer scm_job_thread(gpointer d) {
         }
         g_mutex_unlock(&scm_lock);
     }
-    fclose(out);
+    if (out) fclose(out); else close(out_fd);
     g_mutex_lock(&scm_write_lock); if (scm_in) { fclose(scm_in); scm_in = NULL; } g_mutex_unlock(&scm_write_lock);
     g_mutex_lock(&scm_lock);
     if (!scm_status.connected && !scm_status.error) {
@@ -1044,7 +1063,7 @@ static gpointer epic_dl_thread(gpointer d) {
     }
     FILE *errf = fdopen(err_fd, "r");
     char line[512]; gboolean done = FALSE;
-    while (fgets(line, sizeof line, errf)) {
+    while (errf && fgets(line, sizeof line, errf)) {
         g_strchomp(line);
         if (!*line) continue;
         g_mutex_lock(&epdl_lock);
@@ -1062,7 +1081,7 @@ static gpointer epic_dl_thread(gpointer d) {
         }
         g_mutex_unlock(&epdl_lock);
     }
-    fclose(errf);
+    if (errf) fclose(errf); else close(err_fd);
     g_mutex_lock(&epdl_lock);
     if (!done && ep_status.dl_active) {
         ep_status.dl_active = FALSE; ep_status.error = TRUE;
@@ -1208,14 +1227,15 @@ static int fg_nresults;
 static char fg_query_str[128];
 static gboolean fg_search_busy;
 static gboolean fg_search_done;   /* TRUE une fois la première recherche terminée */
+static char fg_query_pending[128]; /* requête arrivée pendant une recherche : relancée ensuite */
 
 typedef struct { char query[128]; } FgSearchArg;
 
 static gpointer fg_search_thread(gpointer d) {
     FgSearchArg *a = d;
+  again:;
     const char *args[] = {"search", a->query, NULL};
     gchar *out = fg_run(args);
-    g_free(a);
     FgSearchHit tmp[MAXFG_RESULTS]; int n = 0;
     if (out) {
         JsonParser *jp = json_parser_new();
@@ -1236,9 +1256,15 @@ static gpointer fg_search_thread(gpointer d) {
         g_object_unref(jp); g_free(out);
     }
     g_mutex_lock(&fg_search_lock);
+    if (fg_query_pending[0]) {                       /* résultats périmés : on enchaîne sur la dernière requête */
+        g_strlcpy(a->query, fg_query_pending, sizeof a->query); fg_query_pending[0] = 0;
+        g_mutex_unlock(&fg_search_lock);
+        goto again;
+    }
     memcpy(fg_results_cache, tmp, n * sizeof(FgSearchHit));
     fg_nresults = n; fg_search_busy = FALSE; fg_search_done = TRUE;
     g_mutex_unlock(&fg_search_lock);
+    g_free(a);
     return NULL;
 }
 
@@ -1247,6 +1273,7 @@ void fx_fg_search(const char *query) {
     gboolean go = !fg_search_busy; fg_search_busy = TRUE; fg_search_done = FALSE;
     g_strlcpy(fg_query_str, query, sizeof fg_query_str);
     fg_nresults = 0;
+    if (!go) g_strlcpy(fg_query_pending, query, sizeof fg_query_pending);
     g_mutex_unlock(&fg_search_lock);
     if (!go) return;
     FgSearchArg *a = g_new0(FgSearchArg, 1);
@@ -1266,14 +1293,18 @@ gboolean fx_fg_search_busy(void) {
     g_mutex_lock(&fg_search_lock); gboolean b = fg_search_busy; g_mutex_unlock(&fg_search_lock); return b;
 }
 
-const char *fx_fg_query(void) { return fg_query_str; }
+const char *fx_fg_query(void) {                      /* thread principal uniquement */
+    static char q[128];
+    g_mutex_lock(&fg_search_lock); g_strlcpy(q, fg_query_str, sizeof q); g_mutex_unlock(&fg_search_lock);
+    return q;
+}
 
 
 /* ---- Résolution d'URL → liste de fichiers ---- */
 static GMutex fg_resolve_lock;
 static gboolean fg_resolved, fg_resolve_busy, fg_resolve_error;
 static char fg_game_title[128];
-static char fg_resolved_json[8192]; /* JSON complet du job */
+static gchar *fg_resolved_json;    /* JSON complet du job (taille libre : des dizaines de parties) */
 static int fg_file_count_cache;
 
 typedef struct { char url[512]; } FgResolveArg;
@@ -1283,7 +1314,7 @@ static gpointer fg_resolve_thread(gpointer d) {
     const char *args[] = {"resolve", a->url, NULL};
     gchar *out = fg_run(args);
     g_free(a);
-    gboolean ok = FALSE; char title[128] = ""; int nf = 0; char jbuf[8192] = "";
+    gboolean ok = FALSE; char title[128] = ""; int nf = 0; gchar *jbuf = NULL;
     if (out) {
         JsonParser *jp = json_parser_new();
         if (json_parser_load_from_data(jp, out, -1, NULL)) {
@@ -1293,7 +1324,7 @@ static gpointer fg_resolve_thread(gpointer d) {
                 const char *t = jstr(o, "title");
                 if (*t) { g_strlcpy(title, t, sizeof title); ok = TRUE; }
                 nf = json_object_has_member(o, "file_count") ? (int)json_object_get_int_member(o, "file_count") : 0;
-                g_strlcpy(jbuf, out, sizeof jbuf - 1);
+                jbuf = g_strdup(out);
             }
         }
         g_object_unref(jp); g_free(out);
@@ -1302,10 +1333,11 @@ static gpointer fg_resolve_thread(gpointer d) {
     fg_resolved = TRUE; fg_resolve_error = !ok; fg_resolve_busy = FALSE;
     if (ok) {
         g_strlcpy(fg_game_title, title, sizeof fg_game_title);
-        g_strlcpy(fg_resolved_json, jbuf, sizeof fg_resolved_json);
+        g_free(fg_resolved_json); fg_resolved_json = jbuf; jbuf = NULL;
         fg_file_count_cache = nf;
     }
     g_mutex_unlock(&fg_resolve_lock);
+    g_free(jbuf);
     return NULL;
 }
 
@@ -1321,11 +1353,17 @@ void fx_fg_resolve(const char *url) {
 
 gboolean fx_fg_resolved(void) { g_mutex_lock(&fg_resolve_lock); gboolean r = fg_resolved; g_mutex_unlock(&fg_resolve_lock); return r; }
 int      fx_fg_file_count(void) { g_mutex_lock(&fg_resolve_lock); int n = fg_file_count_cache; g_mutex_unlock(&fg_resolve_lock); return n; }
-const char *fx_fg_game_title(void) { return fg_game_title; }
+const char *fx_fg_game_title(void) {                 /* thread principal uniquement */
+    static char t[128];
+    g_mutex_lock(&fg_resolve_lock); g_strlcpy(t, fg_game_title, sizeof t); g_mutex_unlock(&fg_resolve_lock);
+    return t;
+}
 
 /* ---- Téléchargement ---- */
 static GMutex fg_dl_lock;
 static FgDlStatus fg_dl;
+static GSubprocess *fg_dl_proc;     /* processus du helper en cours (protégé par fg_dl_lock) */
+static gboolean fg_dl_cancelled;
 
 
 FgDlStatus fx_fg_dl_status(void) {
@@ -1337,9 +1375,11 @@ static void fg_parse_event(const char *line) {
     if (!line || !*line || *line != '{') return;
     JsonParser *jp = json_parser_new();
     if (!json_parser_load_from_data(jp, line, -1, NULL)) { g_object_unref(jp); return; }
+    if (!JSON_NODE_HOLDS_OBJECT(json_parser_get_root(jp))) { g_object_unref(jp); return; }
     JsonObject *o = json_node_get_object(json_parser_get_root(jp));
     const char *ev = jstr(o, "event");
     g_mutex_lock(&fg_dl_lock);
+    if (fg_dl_cancelled) { g_mutex_unlock(&fg_dl_lock); g_object_unref(jp); return; }   /* sorties d'après l'annulation */
     if (!g_strcmp0(ev, "job_start")) {
         g_strlcpy(fg_dl.game, jstr(o, "title"), sizeof fg_dl.game);
         g_strlcpy(fg_dl.dest, jstr(o, "dest"), sizeof fg_dl.dest);
@@ -1374,25 +1414,35 @@ static void fg_parse_event(const char *line) {
     g_object_unref(jp);
 }
 
-typedef struct { char job_json[8192]; char dest[512]; } FgDlArg;
+typedef struct { gchar *job_json; char dest[512]; } FgDlArg;
 
 static gpointer fg_dl_thread(gpointer d) {
     FgDlArg *a = d;
 
-    /* Écrit le JSON du job dans un fichier temporaire */
-    gchar *tmp = g_build_filename(g_get_tmp_dir(), "coreboard_fg_job.json", NULL);
-    g_file_set_contents(tmp, a->job_json, -1, NULL);
+    /* Écrit le JSON du job dans un fichier temporaire au nom unique (aucune collision entre sessions) */
+    gchar *tmp = NULL;
+    gint tfd = g_file_open_tmp("coreboard-fg-job-XXXXXX.json", &tmp, NULL);
+    if (tfd >= 0) close(tfd);
+    if (tfd < 0 || !g_file_set_contents(tmp, a->job_json, -1, NULL)) {
+        g_mutex_lock(&fg_dl_lock); fg_dl.active = FALSE; fg_dl.error = TRUE; g_strlcpy(fg_dl.msg, "Impossible d'écrire le fichier du job", sizeof fg_dl.msg); g_mutex_unlock(&fg_dl_lock);
+        if (tmp) { g_unlink(tmp); g_free(tmp); }
+        g_free(a->job_json); g_free(a); return NULL;
+    }
 
-    const char *args[] = {"download", tmp, a->dest, NULL};
     const char *helper = fg_helper_path();
-    const char *argv[] = {"python3", helper, args[0], args[1], args[2], NULL};
-    g_free(a);
+    const char *argv[] = {"python3", helper, "download", tmp, a->dest, NULL};
 
     GSubprocess *proc = g_subprocess_newv(argv, G_SUBPROCESS_FLAGS_STDOUT_PIPE | G_SUBPROCESS_FLAGS_STDERR_SILENCE, NULL);
+    g_free(a->job_json); g_free(a);
     if (!proc) {
         g_mutex_lock(&fg_dl_lock); fg_dl.active = FALSE; fg_dl.error = TRUE; g_strlcpy(fg_dl.msg, "Impossible de lancer fistgirl_helper.py", sizeof fg_dl.msg); g_mutex_unlock(&fg_dl_lock);
-        g_free(tmp); return NULL;
+        g_unlink(tmp); g_free(tmp); return NULL;
     }
+    g_mutex_lock(&fg_dl_lock);
+    gboolean cancelled = fg_dl_cancelled;
+    if (cancelled) g_subprocess_force_exit(proc);            /* annulé pendant le démarrage */
+    else fg_dl_proc = g_object_ref(proc);
+    g_mutex_unlock(&fg_dl_lock);
 
     GInputStream *out_stream = g_subprocess_get_stdout_pipe(proc);
     GDataInputStream *dat = g_data_input_stream_new(out_stream);
@@ -1401,32 +1451,37 @@ static gpointer fg_dl_thread(gpointer d) {
         fg_parse_event(line);
         g_free(line);
     }
+    g_clear_error(&err);
     g_object_unref(dat);
     g_subprocess_wait(proc, NULL, NULL);
-    g_object_unref(proc);
     g_unlink(tmp); g_free(tmp);
-    /* Si le processus s'est terminé sans job_completed, marquer comme erreur */
+    /* Si le processus s'est terminé sans job_completed, marquer comme erreur (sauf annulation volontaire) */
     g_mutex_lock(&fg_dl_lock);
-    if (fg_dl.active) { fg_dl.active = FALSE; fg_dl.error = TRUE; g_strlcpy(fg_dl.msg, "Téléchargement interrompu", sizeof fg_dl.msg); }
+    if (fg_dl_proc == proc) g_clear_object(&fg_dl_proc);
+    if (fg_dl_cancelled) { fg_dl.active = FALSE; fg_dl.error = FALSE; g_strlcpy(fg_dl.msg, "Annulé", sizeof fg_dl.msg); }
+    else if (fg_dl.active) { fg_dl.active = FALSE; fg_dl.error = TRUE; g_strlcpy(fg_dl.msg, "Téléchargement interrompu", sizeof fg_dl.msg); }
+    fg_dl_cancelled = FALSE;
     g_mutex_unlock(&fg_dl_lock);
+    g_object_unref(proc);
     return NULL;
 }
 
 void fx_fg_download(const char *dest_dir) {
     g_mutex_lock(&fg_resolve_lock);
-    char jbuf[8192]; g_strlcpy(jbuf, fg_resolved_json, sizeof jbuf);
+    gchar *jbuf = g_strdup(fg_resolved_json);
     g_mutex_unlock(&fg_resolve_lock);
-    if (!jbuf[0]) return;
+    if (!jbuf || !*jbuf) { g_free(jbuf); return; }
 
     g_mutex_lock(&fg_dl_lock);
-    if (fg_dl.active) { g_mutex_unlock(&fg_dl_lock); return; } /* déjà en cours */
+    /* déjà en cours, ou processus annulé pas encore terminé : on n'en lance pas un second dans le même dossier */
+    if (fg_dl.active || fg_dl_proc || fg_dl_cancelled) { g_mutex_unlock(&fg_dl_lock); g_free(jbuf); return; }
     memset(&fg_dl, 0, sizeof fg_dl);
     fg_dl.active = TRUE;
     g_strlcpy(fg_dl.msg, "Initialisation…", sizeof fg_dl.msg);
     g_mutex_unlock(&fg_dl_lock);
 
     FgDlArg *a = g_new0(FgDlArg, 1);
-    g_strlcpy(a->job_json, jbuf, sizeof a->job_json);
+    a->job_json = jbuf;
     g_strlcpy(a->dest, dest_dir, sizeof a->dest);
     g_thread_unref(g_thread_new("coreboard-fg-dl", fg_dl_thread, a));
 }
@@ -1434,10 +1489,10 @@ void fx_fg_download(const char *dest_dir) {
 void fx_fg_cancel(void) {
     g_mutex_lock(&fg_dl_lock);
     if (fg_dl.active) {
-        fg_dl.active = FALSE;
+        fg_dl.active = FALSE; fg_dl_cancelled = TRUE;
         g_strlcpy(fg_dl.msg, "Annulé", sizeof fg_dl.msg);
+        if (fg_dl_proc) g_subprocess_force_exit(fg_dl_proc);   /* arrête vraiment le téléchargement (reprenable plus tard) */
     }
     g_mutex_unlock(&fg_dl_lock);
-    /* Note : le thread python finira proprement au prochain cycle de lecture */
 }
 

@@ -4,6 +4,7 @@
  * coreboard ferme son stdin (fin du jeu) ou à l'expiration de la fenêtre. */
 #include "fanctl.h"
 #include <signal.h>
+#include <sys/stat.h>
 #include <string.h>
 #include <unistd.h>
 
@@ -11,12 +12,26 @@
 
 static GPid pid; static int in_fd = -1, out_fd = -1, level = -1; static guint watch, io_watch;
 
+#ifndef FAND_DIR
+#define FAND_DIR "/usr/local/libexec/coreboard"     /* installé par « sudo make install-fand » */
+#endif
+
+/* le démon est exécuté en root : il doit appartenir à root et n'être modifiable par personne d'autre, lui comme
+   chacun des dossiers parents (sinon un programme tournant sous le compte utilisateur pourrait le remplacer). */
+static gboolean root_owned(const char *path) {
+    gchar *p = g_strdup(path); gboolean ok = p != NULL;
+    while (ok) {
+        struct stat sb;
+        if (lstat(p, &sb) != 0 || S_ISLNK(sb.st_mode) || sb.st_uid != 0 || (sb.st_mode & (S_IWGRP | S_IWOTH))) { ok = FALSE; break; }
+        if (!strcmp(p, "/")) break;
+        gchar *up = g_path_get_dirname(p); g_free(p); p = up;
+    }
+    g_free(p); return ok;
+}
+
 static char *daemon_path(void) {
-    char *p = g_build_filename(DATADIR, "coreboard-fand", NULL);
-    if (g_file_test(p, G_FILE_TEST_IS_REGULAR)) return p;
-    g_free(p);
-    p = g_build_filename(g_get_current_dir(), "data", "coreboard-fand", NULL);     /* exécution depuis les sources */
-    if (g_file_test(p, G_FILE_TEST_IS_REGULAR)) return p;
+    char *p = g_build_filename(FAND_DIR, "coreboard-fand", NULL);
+    if (g_file_test(p, G_FILE_TEST_IS_REGULAR) && root_owned(p)) return p;
     g_free(p); return NULL;
 }
 

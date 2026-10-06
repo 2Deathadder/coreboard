@@ -342,9 +342,10 @@ def check_storage(directory_path, required_bytes=0):
 # -----------------------------------------------------------------------------
 # Téléchargeur multi-fichiers avec reprise (Range) et rapport JSON en direct
 # -----------------------------------------------------------------------------
-def download_stream(direct_url, target_file, file_name, file_idx, total_files, done_before=0, total_all=0):
+def download_stream(direct_url, target_file, file_name, file_idx, total_files, done_before=0):
     """
     Télécharge un fichier avec support HTTP Range et émet des lignes JSON pour l'UI.
+    Un fichier déjà présent est repris là où il s'est arrêté ; s'il est complet, le serveur répond 416.
     """
     target = Path(target_file)
     existing_bytes = target.stat().st_size if target.exists() else 0
@@ -359,7 +360,13 @@ def download_stream(direct_url, target_file, file_name, file_idx, total_files, d
     bytes_this_session = 0
 
     try:
-        with urllib.request.urlopen(req, timeout=20) as resp:
+        try:
+            resp_cm = urllib.request.urlopen(req, timeout=20)
+        except urllib.error.HTTPError as e:
+            if e.code == 416 and existing_bytes > 0:   # plage hors fichier : déjà entièrement téléchargé
+                return existing_bytes
+            raise
+        with resp_cm as resp:
             content_length = resp.headers.get("Content-Length")
             file_total = int(content_length) + existing_bytes if content_length else 0
 
@@ -367,6 +374,9 @@ def download_stream(direct_url, target_file, file_name, file_idx, total_files, d
             mode = "ab" if resp.status == 206 else "wb"
             if resp.status == 200 and existing_bytes > 0:
                 existing_bytes = 0
+                file_total = int(content_length) if content_length else 0
+            # taille totale estimée : les parties FitGirl ont toutes la même taille (sauf la dernière)
+            total_all = done_before + file_total * (total_files - file_idx) if file_total else 0
 
             with open(target, mode) as f:
                 while True:
@@ -397,7 +407,16 @@ def download_stream(direct_url, target_file, file_name, file_idx, total_files, d
 
         return target.stat().st_size
     except Exception as e:
-        raise RuntimeError(f"Erreur téléchargement de {file_name}: {e}")
+        raise RuntimeError(f"Erreur téléchargement de {file_name}: {e}") from e
+
+def safe_filename(name, idx):
+    """
+    Nom local sûr : le nom vient de l'URL distante (fragment #...) et ne doit jamais sortir du dossier cible.
+    """
+    name = urllib.parse.unquote(str(name)).replace("\\", "/")
+    name = name.rsplit("/", 1)[-1].strip().lstrip(".")
+    name = re.sub(r'[\x00-\x1f]', '', name)
+    return name or f"part{idx+1:02d}.bin"
 
 def run_download_job(resolved_json_path, target_dir):
     """
@@ -417,17 +436,12 @@ def run_download_job(resolved_json_path, target_dir):
 
     total_done = 0
     for idx, item in enumerate(files):
-        fname = item["name"]
+        fname = safe_filename(item.get("name", ""), idx)
         local_dest = target_path / fname
         source_url = item.get("source_url", "")
         direct_url = item.get("direct_url", "")
-
-        # Si le fichier complet existe déjà
-        if local_dest.exists() and local_dest.stat().st_size > 10 * 1024 * 1024:
-            # Vérifie si le fichier suivant existe ou si c'est déjà fini
-            emit_json({"event": "file_cached", "file": fname, "file_index": idx, "file_count": total_files})
-            total_done += local_dest.stat().st_size
-            continue
+        # Un fichier déjà présent n'est jamais supposé complet : download_stream le reprend via Range
+        # (réponse 416 = déjà terminé), ce qui évite de garder une partie interrompue en cours de route.
 
         # Résolution du lien direct à la volée pour éviter les URLs expirées
         if not direct_url:
@@ -436,9 +450,11 @@ def run_download_job(resolved_json_path, target_dir):
             item["direct_url"] = direct_url
 
         emit_json({"event": "file_start", "file": fname, "file_index": idx, "file_count": total_files})
+        had = local_dest.stat().st_size if local_dest.exists() else 0
         fsize = download_stream(direct_url, local_dest, fname, idx, total_files, done_before=total_done)
         total_done += fsize
-        emit_json({"event": "file_done", "file": fname, "file_index": idx, "file_count": total_files})
+        emit_json({"event": "file_cached" if had and had == fsize else "file_done",
+                   "file": fname, "file_index": idx, "file_count": total_files})
 
     emit_json({"event": "job_completed", "title": game_title, "total_bytes": total_done, "dest": str(target_path)})
 

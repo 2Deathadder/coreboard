@@ -89,6 +89,13 @@ static guint redraw_timer;
 static gboolean redraw_once(gpointer p) { (void)p; redraw_timer = 0; if (area) gtk_widget_queue_draw(area); return G_SOURCE_REMOVE; }
 static void schedule_redraw(guint ms) { if (!redraw_timer) redraw_timer = g_timeout_add(ms, redraw_once, NULL); }
 
+static void on_tool_installed(const char *pkg, gboolean ok, const char *why) {
+    char b[200];
+    if (ok) g_snprintf(b, sizeof b, "%s installé", pkg);
+    else g_snprintf(b, sizeof b, "Installation de %s : %s", pkg, why ? why : "échec");
+    show_toast(b);
+}
+
 static void on_job(const char *msg, gboolean ok, gpointer d) {
     (void)d;
     if (!ok) { char b[340]; g_snprintf(b, sizeof b, "Échec : %s", msg && *msg ? msg : "erreur inconnue"); show_toast(b); }
@@ -2430,7 +2437,7 @@ static void ensure_backend(GApplication *app) {
     if (backend_up) return;
     backend_up = TRUE; the_app = app;
     hw_set_notify(on_new_data); hw_start(); hw_started = TRUE;
-    fx_init(); fx_windows_refresh(); rgb_init(); gv_init(); mx_init(); wg_init();
+    fx_init(); fx_tool_install_set_done(on_tool_installed); fx_windows_refresh(); rgb_init(); gv_init(); mx_init(); wg_init();
     g_timeout_add(1000, tick, NULL);
     g_timeout_add(2000, fx_timer, NULL);
     g_timeout_add(45, music_timer, NULL);

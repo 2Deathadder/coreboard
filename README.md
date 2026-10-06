@@ -11,6 +11,7 @@ Dépendances : `gcc`, `make`, `pkg-config`, `gtk4`, `json-glib`, `fontconfig` (p
     make                 # compile
     make install         # ~/.local (PREFIX=/usr/local pour un autre préfixe)
     make uninstall
+    sudo make install-fand   # démon root de refroidissement adaptatif (MSI), installé dans /usr/local/libexec/coreboard
     make test            # test d'intégration de la couche matériel (change puis restaure écran/volume/profil)
 
 `coreboard` lance l'app ; un second appel `coreboard --toggle` ferme la fenêtre si elle est déjà ouverte

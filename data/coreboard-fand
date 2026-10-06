@@ -44,10 +44,37 @@ cpu_path = next((os.path.join(d, "temp1_input") for d in glob.glob("/sys/class/h
                  if open(os.path.join(d, "name")).read().strip() == "coretemp"), None)
 
 
+def _nv_pm_paths():
+    out = []
+    for d in glob.glob("/sys/bus/pci/devices/*"):
+        try:
+            if open(d + "/vendor").read().strip() == "0x10de" and open(d + "/class").read().startswith("0x03"):
+                out.append(d + "/power/runtime_status")
+        except OSError:
+            pass
+    return out
+
+
+nv_pm = _nv_pm_paths()
+
+
+def gpu_awake():
+    # nvidia-smi réveille un dGPU suspendu (D3cold) : on ne l'interroge que s'il est déjà actif
+    for p in nv_pm:
+        try:
+            if open(p).read().strip() != "active":
+                return False
+        except OSError:
+            pass
+    return bool(nv_pm)
+
+
 def temps():
     t = 0.0
     if cpu_path:
         t = int(open(cpu_path).read()) / 1000
+    if not gpu_awake():
+        return t
     try:
         g = subprocess.run(["nvidia-smi", "--query-gpu=temperature.gpu", "--format=csv,noheader,nounits"],
                            capture_output=True, text=True, timeout=2).stdout.strip()
@@ -58,22 +85,29 @@ def temps():
 
 
 def set_level(l):
-    wr(FAN_MODE, FAN_ADV if l >= 1 else (orig_mode if orig_mode != FAN_ADV else FAN_AUTO))
-    wr(BOOST, (rd(BOOST) & ~BOOST_BIT & 0xFF) | (BOOST_BIT if l == 2 else 0))
+    mode = FAN_ADV if l >= 1 else (orig_mode if orig_mode != FAN_ADV else FAN_AUTO)
+    boost = (rd(BOOST) & ~BOOST_BIT & 0xFF) | (BOOST_BIT if l == 2 else 0)
+    if rd(FAN_MODE) != mode:                            # n'écrit dans l'EC que si la valeur change
+        wr(FAN_MODE, mode)
+    if rd(BOOST) != boost:
+        wr(BOOST, boost)
 
 
-def restore(*_):
+def restore():
     wr(FAN_MODE, orig_mode if orig_mode != FAN_ADV else FAN_AUTO)
     wr(BOOST, (rd(BOOST) & ~BOOST_BIT & 0xFF) | orig_boost)
-    sys.exit(0)
+
+
+def on_signal(*_):
+    raise SystemExit(0)                                 # la restauration est faite une seule fois, dans finally
 
 
 for s in (signal.SIGTERM, signal.SIGINT, signal.SIGHUP):
-    signal.signal(s, restore)
+    signal.signal(s, on_signal)
 
 deadline, level, calm, last = time.time() + window, 1, 0, None
-set_level(level)                                        # pré-refroidissement dès le lancement
 try:
+    set_level(level)                                    # pré-refroidissement dès le lancement
     while time.time() < deadline:
         r, _, _ = select.select([sys.stdin], [], [], 1.0)
         if r and not sys.stdin.readline():              # stdin fermé : coreboard s'arrête
@@ -92,7 +126,7 @@ try:
                     level, calm = level - 1, 0
             else:
                 calm = 0
-        set_level(level)
+        set_level(level)                                # relit l'EC : réapplique si le firmware a changé le mode
         print(level, flush=True)
 finally:
     restore()

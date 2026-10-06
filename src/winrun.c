@@ -393,7 +393,7 @@ static gpointer dl_worker(gpointer d) {
                     JsonArray *as = json_object_get_array_member(o, "assets");
                     for (guint i = 0; i < json_array_get_length(as) && !url; i++) {
                         JsonObject *a = json_array_get_object_element(as, i); const char *n = json_object_get_string_member(a, "name");
-                        if (g_str_has_suffix(n, ".tar.gz") && !strstr(n, "aarch64") && !strstr(n, "arm")) { name = g_strdup(n); url = g_strdup(json_object_get_string_member(a, "browser_download_url")); size = json_object_get_int_member(a, "size"); }
+                        if (n && !strchr(n, '/') && g_str_has_suffix(n, ".tar.gz") && !strstr(n, "aarch64") && !strstr(n, "arm")) { name = g_strdup(n); url = g_strdup(json_object_get_string_member(a, "browser_download_url")); size = json_object_get_int_member(a, "size"); }
                     }
                 }
             }
@@ -405,7 +405,8 @@ static gpointer dl_worker(gpointer d) {
 
     gchar *dd = data_dir("downloads"), *part = g_build_filename(dd, name, NULL);
     lock_write(size);
-    gchar *sumurl = g_strdup(url); { char *e = strstr(sumurl, ".tar.gz"); if (e) strcpy(e, ".sha512sum"); }
+    gchar *sumurl;                                                  /* « .tar.gz » (7) → « .sha512sum » (10) : nouvelle chaîne */
+    { const char *e = strstr(url, ".tar.gz"); sumurl = e ? g_strdup_printf("%.*s.sha512sum", (int)(e - url), url) : g_strdup(url); }
     gboolean installed = FALSE; const char *fail = "Téléchargement interrompu";
     for (int attempt = 0; attempt < 2 && !installed; attempt++) {
         dl_set(2, 0, size, attempt ? "Nouveau téléchargement (l'archive était corrompue)…" : "Téléchargement de Proton-GE…");

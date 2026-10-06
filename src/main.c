@@ -20,6 +20,7 @@
 #include "music.h"
 #include "rgb.h"
 #include "compat.h"
+#include <json-glib/json-glib.h>
 
 #ifndef DATADIR
 #define DATADIR "/usr/local/share/coreboard"
@@ -2247,8 +2248,30 @@ static gboolean fg_want_delete(const char *dir) {
     return fb < ab * 3.7;                           /* extraction (≈ 1 × archives) + installation (jusqu'à ≈ 2,7 × archives) */
 }   /* jeu téléchargé à extraire / installer (téléchargement fini ou trouvé sur le disque) */
 
+/* jeux FitGirl installés : dossier téléchargé → exécutable du jeu (~/.config/coreboard/fitgirl.json), pour les retrouver après un redémarrage */
+static gchar *fg_installed_path(void) { return g_build_filename(g_get_user_config_dir(), "coreboard", "fitgirl.json", NULL); }
+static gchar *fg_installed_lookup(const char *dir) {
+    gchar *p = fg_installed_path(), *out = NULL; JsonParser *jp = json_parser_new();
+    if (json_parser_load_from_file(jp, p, NULL) && JSON_NODE_HOLDS_OBJECT(json_parser_get_root(jp))) {
+        JsonObject *o = json_node_get_object(json_parser_get_root(jp));
+        if (json_object_has_member(o, dir)) out = g_strdup(json_object_get_string_member(o, dir));
+    }
+    g_object_unref(jp); g_free(p);
+    if (out && !g_file_test(out, G_FILE_TEST_IS_REGULAR)) { g_free(out); out = NULL; }   /* jeu désinstallé depuis */
+    return out;
+}
+static void fg_installed_store(const char *dir, const char *exe) {
+    gchar *p = fg_installed_path(); JsonParser *jp = json_parser_new(); JsonObject *o;
+    if (json_parser_load_from_file(jp, p, NULL) && JSON_NODE_HOLDS_OBJECT(json_parser_get_root(jp))) o = json_object_ref(json_node_get_object(json_parser_get_root(jp)));
+    else o = json_object_new();
+    if (exe) json_object_set_string_member(o, dir, exe); else if (json_object_has_member(o, dir)) json_object_remove_member(o, dir);
+    JsonNode *n = json_node_new(JSON_NODE_OBJECT); json_node_take_object(n, o);
+    JsonGenerator *g = json_generator_new(); json_generator_set_root(g, n); json_generator_set_pretty(g, TRUE); json_generator_to_file(g, p, NULL);
+    g_object_unref(g); json_node_free(n); g_object_unref(jp); g_free(p);
+}
+
 /* jeux déjà téléchargés dans le dossier FitGirl : relus sur le disque, donc toujours visibles après un redémarrage */
-typedef struct { char name[128], path[512], setup[512]; int parts; gboolean complete, extracted; double bytes; } FgLocal;
+typedef struct { char name[128], path[512], setup[512], game[512]; int parts; gboolean complete, extracted; double bytes; } FgLocal;
 static FgLocal fg_local[16]; static int fg_nlocal; static gint64 fg_local_at;
 
 static void fg_scan_local(void) {
@@ -2273,6 +2296,7 @@ static void fg_scan_local(void) {
             if (g_file_test(sx, G_FILE_TEST_IS_REGULAR)) g_strlcpy(L.setup, sx, sizeof L.setup);
             g_free(sx);
         }
+        { gchar *ge = fg_installed_lookup(path); if (ge) { g_strlcpy(L.game, ge, sizeof L.game); g_free(ge); } }
         if (L.parts || L.setup[0]) { g_strlcpy(L.name, n, sizeof L.name); g_strlcpy(L.path, path, sizeof L.path); fg_local[fg_nlocal++] = L; }
         g_free(path);
     }
@@ -2387,6 +2411,7 @@ static gboolean fg_add_installed(const char *exe, const char *title) {
     wg_remove(wg_find(fg_setup_exe), FALSE);                /* l'entrée de l'installateur ne sert plus (préfixe conservé) */
     fg_setup_exe[0] = 0; fg_installed = TRUE;
     g_strlcpy(fg_game_exe, exe, sizeof fg_game_exe);
+    if (fg_tgt_dir[0]) { fg_installed_store(fg_tgt_dir, exe); fg_local_at = 0; }
     return TRUE;
 }
 
@@ -2401,6 +2426,54 @@ static gboolean fg_auto_add(const char *title) {
     if (g_file_test(root, G_FILE_TEST_IS_DIR)) find_exe(root, 0, best, sizeof best, &score);
     g_free(root);
     return best[0] && fg_add_installed(best, title);
+}
+
+/* ---- suivi de l'installation en arrière-plan (indépendant de la page affichée) */
+static guint fg_tick_id;
+static gboolean fg_log_ok;                 /* journal Inno : « Installation process succeeded » */
+static gint64 fg_log_closed_at;
+static char fg_inst_title[128];            /* titre utilisé au lancement (même dossier C:\Games\<jeu> à l'ajout) */
+
+static gboolean fg_install_tick(gpointer d) {
+    (void)d;
+    int si = fg_setup_exe[0] ? wg_find(fg_setup_exe) : -1;
+    if (si < 0) { fg_tick_id = 0; return G_SOURCE_REMOVE; }
+    int n; WinGame *w = wg_list(&n);
+    gchar *logp = g_build_filename(w[si].prefix, "drive_c", "coreboard-install.log", NULL), *log = NULL;
+    g_file_get_contents(logp, &log, NULL, NULL); g_free(logp);
+    if (log && !fg_log_ok && strstr(log, "Installation process succeeded")) {
+        fg_log_ok = TRUE;
+        /* étapes lancées après l'installation (vérificateur QuickSFV, DirectX, Visual C++) : elles attendent un clic dans
+           des fenêtres invisibles, et Proton fournit déjà DirectX et Visual C++ → on les saute en masquant _Redist */
+        char dn[64]; fg_win_dirname(fg_inst_title, dn, sizeof dn);
+        gchar *rd = g_build_filename(w[si].prefix, "drive_c", "Games", dn, "_Redist", NULL), *rd2 = g_strconcat(rd, ".coreboard", NULL);
+        if (g_file_test(rd, G_FILE_TEST_IS_DIR)) g_rename(rd, rd2);
+        g_free(rd); g_free(rd2);
+    }
+    if (w[si].running) {
+        HiddenState hs;
+        if (hidden_state(wg_display(si), &hs) && hs.error && !fg_log_ok) { wg_stop(si); fg_isdone_err = TRUE; show_toast("L'installation a échoué pendant la décompression"); }
+        if (log && strstr(log, "Log closed")) {                /* installateur fermé : on termine la session Wine du préfixe */
+            if (!fg_log_closed_at) fg_log_closed_at = g_get_monotonic_time();
+            else if (g_get_monotonic_time() - fg_log_closed_at > 8 * G_USEC_PER_SEC) wg_stop(si);
+        }
+    } else {
+        if (fg_log_ok && fg_auto_add(fg_inst_title)) show_toast("Installation terminée : le jeu est prêt à jouer");
+        g_free(log); fg_tick_id = 0;
+        if (area) gtk_widget_queue_draw(area);
+        return G_SOURCE_REMOVE;
+    }
+    g_free(log);
+    return G_SOURCE_CONTINUE;
+}
+
+/* relance de l'installateur déjà ajouté (même préfixe), avec le suivi en arrière-plan */
+static void fg_relaunch(int si) {
+    int n; WinGame *w = wg_list(&n);
+    fg_isdone_err = FALSE; fg_log_ok = FALSE; fg_log_closed_at = 0;
+    gchar *lg = g_build_filename(w[si].prefix, "drive_c", "coreboard-install.log", NULL); g_unlink(lg); g_free(lg);
+    wg_launch(si);
+    if (!fg_tick_id) fg_tick_id = g_timeout_add(1000, fg_install_tick, NULL);
 }
 
 static gboolean fg_launch_setup(const char *setup, const char *title) {
@@ -2436,7 +2509,10 @@ static gboolean fg_launch_setup(const char *setup, const char *title) {
     gchar *pd = g_path_get_dirname(w[i].prefix);
     g_snprintf(w[i].prefix, sizeof w[i].prefix, "%s/fitgirl-%s", pd, *slug ? slug : "jeu");
     g_free(pd);
-    wg_save(); wg_launch(i); fg_isdone_err = FALSE;
+    wg_save(); wg_launch(i); fg_isdone_err = FALSE; fg_log_ok = FALSE; fg_log_closed_at = 0;
+    g_strlcpy(fg_inst_title, title, sizeof fg_inst_title);
+    gchar *oldlog = g_build_filename(w[i].prefix, "drive_c", "coreboard-install.log", NULL); g_unlink(oldlog); g_free(oldlog);
+    if (!fg_tick_id) fg_tick_id = g_timeout_add(1000, fg_install_tick, NULL);
     g_strlcpy(fg_setup_exe, setup, sizeof fg_setup_exe);
     g_free(viaexe);
     { struct statvfs sv; fg_inst_free0 = statvfs(w[i].prefix[0] ? g_get_home_dir() : "/", &sv) == 0 ? (double)sv.f_bavail * sv.f_frsize : 0; fg_inst_t0 = g_get_monotonic_time(); }
@@ -2591,11 +2667,8 @@ static void page_fitgirl(cairo_t *cr) {
                 double written = fg_inst_free0 > fnow ? fg_inst_free0 - fnow : 0, secs = (g_get_monotonic_time() - fg_inst_t0) / 1e6;
                 char wr[32], rt[32]; fmt_size(wr, sizeof wr, written); fmt_rate(rt, sizeof rt, secs > 1 ? written / secs : 0);
                 HiddenState hs; gboolean hv = hidden_state(wg_display(si), &hs);
-                if (hv && hs.error) {                                     /* message d'erreur d'ISDone : on arrête plutôt que d'attendre */
-                    wg_stop(si); fg_isdone_err = TRUE;
-                    show_toast("L'installation a échoué pendant la décompression");
-                }
-                if (hv && hs.pct >= 0) g_snprintf(dm, sizeof dm, "Installation automatique : %.1f %% — reste %s", hs.pct, hs.eta);
+                if (fg_log_ok) g_snprintf(dm, sizeof dm, "Finalisation de l'installation…");
+                else if (hv && hs.pct >= 0) g_snprintf(dm, sizeof dm, "Installation automatique : %.1f %% — reste %s", hs.pct, hs.eta);
                 else g_snprintf(dm, sizeof dm, "Installation automatique en cours%.*s", dots, "...");
                 text(cr, dm, px, y + 84, 12.5, 600, F_SANS, C_TEXT, 1, 0, 0);
                 if (hv && hs.pct >= 0) fg_bar(cr, px, y + 98, pw - 230, 6, hs.pct / 100.0);
@@ -2605,20 +2678,20 @@ static void page_fitgirl(cairo_t *cr) {
             } else if (ex.done && si >= 0) {
                 /* installateur terminé : ajout automatique une seule fois, sinon choix manuel */
                 static char tried_for[512];
-                if (strcmp(tried_for, fg_setup_exe)) {
+                if (strcmp(tried_for, fg_setup_exe)) {                   /* filet de sécurité si la minuterie n'a pas tourné */
                     g_strlcpy(tried_for, fg_setup_exe, sizeof tried_for);
-                    if (fg_auto_add(fg_tgt_title)) { show_toast("Installation terminée : le jeu est prêt"); if (area) gtk_widget_queue_draw(area); return; }
+                    if (fg_auto_add(fg_inst_title[0] ? fg_inst_title : fg_tgt_title)) { show_toast("Installation terminée : le jeu est prêt"); if (area) gtk_widget_queue_draw(area); return; }
                 }
-                gboolean ok_exit = !strcmp(wgl[si].status, "Terminé") && !fg_isdone_err;
+                gboolean ok_exit = fg_log_ok && !fg_isdone_err;
                 text_fit(cr, ok_exit ? "Installation terminée, mais l'exécutable du jeu n'a pas été trouvé automatiquement."
                                      : fg_isdone_err ? "Échec de la décompression des données FitGirl (Unarc / ISDone) sous Wine."
                                      : "L'installation s'est arrêtée avant la fin (annulée ou erreur).", px, y + 84, 12.5, 600, F_SANS, ok_exit ? 0xe0a800 : C_RED, pw - 230, 0);
                 text(cr, ok_exit ? "Choisis l'exécutable du jeu dans C:\\Games." : "Relance l'installation, ou consulte le journal du jeu dans Jeux Windows.", px, y + 106, 12, 400, F_SANS, C_MUTE, 1, 0, 0);
                 if (primary_btn(cr, bx - 190, y + 40, 190, 34, ok_exit ? "Choisir l'exécutable" : "Relancer l'installation")) {
-                    if (ok_exit) pick_fg_game_exe(fg_tgt_title); else { tried_for[0] = 0; fg_isdone_err = FALSE; wg_launch(si); }
+                    if (ok_exit) pick_fg_game_exe(fg_tgt_title); else { tried_for[0] = 0; fg_relaunch(si); }
                 }
                 if (outline_btn(cr, bx - 190, y + 86, 190, 28, ok_exit ? "Relancer l'installation" : "Choisir l'exécutable", 12)) {
-                    if (ok_exit) { tried_for[0] = 0; fg_isdone_err = FALSE; wg_launch(si); } else pick_fg_game_exe(fg_tgt_title);
+                    if (ok_exit) { tried_for[0] = 0; fg_relaunch(si); } else pick_fg_game_exe(fg_tgt_title);
                 }
             } else if (ex.done && fg_installed) {
                 char rd[200]; g_snprintf(rd, sizeof rd, "✓  %s est installé et prêt à jouer.", fg_tgt_title);
@@ -2660,7 +2733,7 @@ static void page_fitgirl(cairo_t *cr) {
                         fg_del_confirm = 0;
                         gboolean ok = fg_delete_download(fg_tgt_dir);
                         show_toast(ok ? "Archives supprimées" : "Suppression refusée (dossier inattendu)");
-                        if (ok) { fg_tgt_dir[0] = 0; fg_installed = FALSE; fx_fg_ex_reset(); fg_local_at = 0; }
+                        if (ok) { fg_installed_store(fg_tgt_dir, NULL); fg_tgt_dir[0] = 0; fg_installed = FALSE; fx_fg_ex_reset(); fg_local_at = 0; }
                     }
                 }
             }
@@ -2710,11 +2783,18 @@ static void page_fitgirl(cairo_t *cr) {
             panel(cr, X0, y, CW, 64, FALSE);
             text_fit(cr, L->name, X0 + 20, y + 22, 14, 600, F_SANS, C_TEXT, CW - 280, 0);
             char sz[32], info[160]; fmt_size(sz, sizeof sz, L->bytes);
-            if (L->parts) g_snprintf(info, sizeof info, "%d partie%s · %s · %s", L->parts, L->parts > 1 ? "s" : "", sz,
+            if (L->game[0]) g_snprintf(info, sizeof info, "Installé · %s de fichiers téléchargés encore sur le disque", sz);
+            else if (L->parts) g_snprintf(info, sizeof info, "%d partie%s · %s · %s", L->parts, L->parts > 1 ? "s" : "", sz,
                                      !L->complete ? "téléchargement incomplet" : L->setup[0] ? "déjà extrait" : "complet");
             else g_snprintf(info, sizeof info, "Archives extraites puis supprimées · prêt à installer");
             text(cr, info, X0 + 20, y + 44, 12, 400, F_SANS, L->complete ? C_LABEL : 0xe0a800, 1, 0, 0);
-            if (!L->complete) text(cr, "Sélectionne le jeu dans la recherche pour reprendre", XR - 20, y + 32, 11.5, 400, F_SANS, C_MUTE, 1, 2, 0);
+            if (L->game[0]) {
+                if (primary_btn(cr, XR - 20 - 200, y + 15, 200, 34, "Jouer")) { int gi = wg_find(L->game); if (gi >= 0) { wg_launch(gi); show_toast("Lancement du jeu…"); } }
+                if (outline_btn(cr, XR - 20 - 200 - 10 - 150, y + 18, 150, 28, "Gérer", 12)) {
+                    g_strlcpy(fg_tgt_dir, L->path, sizeof fg_tgt_dir); g_strlcpy(fg_tgt_title, L->name, sizeof fg_tgt_title);
+                    g_strlcpy(fg_game_exe, L->game, sizeof fg_game_exe); fg_installed = TRUE; fx_fg_ex_set_done(L->setup[0] ? L->setup : L->game);
+                }
+            } else if (!L->complete) text(cr, "Sélectionne le jeu dans la recherche pour reprendre", XR - 20, y + 32, 11.5, 400, F_SANS, C_MUTE, 1, 2, 0);
             else if (busy) text(cr, "Une installation est déjà en cours", XR - 20, y + 32, 11.5, 400, F_SANS, C_MUTE, 1, 2, 0);
             else if (primary_btn(cr, XR - 20 - 200, y + 15, 200, 34, L->setup[0] ? "Lancer l'installateur" : "Préparer l'installation")) {
                 g_strlcpy(fg_tgt_dir, L->path, sizeof fg_tgt_dir); g_strlcpy(fg_tgt_title, L->name, sizeof fg_tgt_title);

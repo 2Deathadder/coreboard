@@ -2035,117 +2035,203 @@ static void nav_item(cairo_t *cr, double y, int pg, const char *t, int ic) {
 static void nav_section(cairo_t *cr, double y, const char *t) { text(cr, t, 16, y + 13, 11.5, 400, F_SANS, 0x808086, 1, 0, 0); }
 
 /* ------------------------------------------------------------------ Page FitGirl Repacks */
+/* ---- FitGirl : dossier de destination (par défaut ~/Games/FitGirl/<jeu>, modifiable) */
+static char fg_base_dir[512];
+
+static void on_fg_folder(GObject *src, GAsyncResult *res, gpointer d) {
+    (void)d;
+    GFile *f = gtk_file_dialog_select_folder_finish(GTK_FILE_DIALOG(src), res, NULL);
+    if (!f) return;
+    gchar *path = g_file_get_path(f); g_object_unref(f);
+    if (path) { g_strlcpy(fg_base_dir, path, sizeof fg_base_dir); g_free(path); }
+    if (area) gtk_widget_queue_draw(area);
+}
+
+static void pick_fg_folder(void) {
+    GtkFileDialog *d = gtk_file_dialog_new();
+    gtk_file_dialog_set_title(d, "Dossier des téléchargements FitGirl");
+    gchar *cur = g_build_filename(g_get_home_dir(), "Games", NULL); GFile *cf = g_file_new_for_path(fg_base_dir[0] ? fg_base_dir : cur);
+    gtk_file_dialog_set_initial_folder(d, cf); g_object_unref(cf); g_free(cur);
+    gtk_file_dialog_select_folder(d, GTK_WINDOW(win), NULL, on_fg_folder, NULL);
+    g_object_unref(d);
+}
+
+/* dossier du jeu : nom court (avant « – » ou « + »), sans caractères interdits */
+static void fg_game_dir(const char *title, char *out, size_t n) {
+    if (!fg_base_dir[0]) g_snprintf(fg_base_dir, sizeof fg_base_dir, "%s/Games/FitGirl", g_get_home_dir());
+    gchar *t = g_strdup(*title ? title : "Jeu");
+    for (const char *cut[] = {" – ", " - ", " + ", " (", NULL}, **c = cut; *c; c++) { char *p = strstr(t, *c); if (p && p != t) *p = 0; }
+    GString *g = g_string_new(NULL);                   /* « God of War: Ragnarök » → « God of War - Ragnarök » */
+    for (const char *p = t; *p; p++) {
+        if (*p == ':') g_string_append(g, " -");
+        else if (strchr("/\\*?\"<>|", *p)) g_string_append_c(g, ' ');
+        else if (!(*p == ' ' && g->len && g->str[g->len - 1] == ' ')) g_string_append_c(g, *p);
+    }
+    g_free(t); t = g_string_free(g, FALSE);
+    g_strstrip(t);
+    g_snprintf(out, n, "%s/%s", fg_base_dir, *t ? t : "Jeu");
+    g_free(t);
+}
+
+/* chemin affiché : ~ pour le dossier personnel */
+static void fg_short_path(const char *p, char *out, size_t n) {
+    const char *home = g_get_home_dir(); size_t hl = strlen(home);
+    if (!strncmp(p, home, hl) && (p[hl] == '/' || !p[hl])) g_snprintf(out, n, "~%s", p + hl); else g_strlcpy(out, p, n);
+}
+
+static void fmt_size(char *b, size_t n, double v) {
+    if (v >= 1073741824.0) g_snprintf(b, n, "%.1f Go", v / 1073741824.0);
+    else g_snprintf(b, n, "%.0f Mo", v / 1048576.0);
+}
+
+static void fmt_eta(char *b, size_t n, double s) {
+    if (s < 60) g_snprintf(b, n, "%.0f s", s);
+    else if (s < 3600) g_snprintf(b, n, "%.0f min", s / 60);
+    else g_snprintf(b, n, "%d h %02d", (int)(s / 3600), (int)fmod(s / 60, 60));
+}
+
+/* bouton plein rouge : action principale */
+static gboolean primary_btn(cairo_t *cr, double x, double y, double w, double h, const char *t) {
+    gboolean hov = hit(x, y, w, h);
+    cairo_rectangle(cr, x, y, w, h); rgba(cr, hov ? 0xff3a55 : C_RED, 1); cairo_fill(cr);
+    text(cr, t, x + w / 2, y + h / 2, 13, 700, F_SANS, 0xffffff, 1, 1, 0);
+    return clicked(x, y, w, h);
+}
+
+/* barre de progression fine avec fond */
+static void fg_bar(cairo_t *cr, double x, double y, double w, double h, double frac) {
+    cairo_rectangle(cr, x, y, w, h); rgba(cr, 0x1e1e22, 1); cairo_fill(cr);
+    cairo_rectangle(cr, x, y, w * CLAMP(frac, 0, 1), h); rgba(cr, C_RED, 1); cairo_fill(cr);
+}
+
 static void page_fitgirl(cairo_t *cr) {
     ptitle(cr, "FitGirl Repacks");
-    text(cr, "Recherche et téléchargement de repacks FitGirl directement depuis Coreboard.", X0, 82, 12.5, 400, F_SANS, C_MUTE, 1, 0, 0);
-
-    double cy = VY0 + 20;
-
-    /* ---- Barre de recherche ---- */
-    section(cr, "Rechercher un repack", X0, cy);
+    text(cr, "Recherche et téléchargement de repacks FitGirl : plusieurs connexions par fichier, reprise automatique après coupure.", X0, 82, 12.5, 400, F_SANS, C_MUTE, 1, 0, 0);
     const char *q = fx_fg_query();
-    char qbuf[160];
-    g_snprintf(qbuf, sizeof qbuf, *q ? "Résultats pour « %s »" : "Aucune recherche lancée", q);
-    text(cr, qbuf, X0, cy + 24, 12.5, 400, F_SANS, C_MUTE, 1, 0, 0);
-    if (outline_btn(cr, XR - 180, cy - 5, 180, 26, "Nouvelle recherche…", 12))
-        ask_text(6, 0, "Rechercher un repack FitGirl", q);
-    cy += 44;
+    if (*q && outline_btn(cr, XR - 310, 38, 170, 26, "Nouvelle recherche…", 12)) { ask_text(6, 0, "Rechercher un repack FitGirl", q); return; }
 
-    /* ---- Résultats ---- */
+    static gboolean paused;                     /* « Pause » : le helper est arrêté, l'état des segments est conservé */
+    double y = 104;
+    FgDlStatus st = fx_fg_dl_status();
+    const char *page_url = fx_fg_page_url();
+    gboolean busy_res = fx_fg_resolve_busy(), resolved = fx_fg_resolved();
+    gboolean show_card = *page_url || st.active || st.completed || st.error;
+
+    /* ---- carte du jeu sélectionné / téléchargement ---- */
+    if (show_card) {
+        const char *gtitle = st.active || st.completed ? st.game : fx_fg_game_title();
+        const char *rerr = fx_fg_resolve_error();
+        int nfiles = fx_fg_file_count(), nopt = fx_fg_optional_count();
+        char dest[512]; fg_game_dir(gtitle, dest, sizeof dest);
+        double ch = st.active ? 176 : 144;
+        panel(cr, X0, y, CW, ch, st.active);
+        double px = X0 + 22, pw = CW - 44, bx = XR - 22;
+
+        section(cr, st.active ? "Téléchargement en cours" : st.completed ? "Téléchargement terminé" : "Jeu sélectionné", px, y + 24);
+        text_fit(cr, *gtitle ? gtitle : (busy_res ? "Recherche des liens…" : "—"), px, y + 54, 16, 700, F_SANS, C_TEXT, pw - 230, 0);
+
+        if (st.active) {
+            char l1[256], a[32], b2[32], c[32], l2[256];
+            if (st.resolving) g_snprintf(l1, sizeof l1, "Partie %d / %d — obtention du lien…", st.file_current + 1, st.file_count);
+            else g_snprintf(l1, sizeof l1, "Partie %d / %d — %s", st.file_current + 1, st.file_count, st.file_name);
+            text_fit(cr, l1, px, y + 84, 12.5, 400, F_SANS, C_LABEL, pw - 140, 0);
+            if (st.file_size > 0) { fmt_size(a, sizeof a, st.file_bytes); fmt_size(b2, sizeof b2, st.file_size); g_snprintf(c, sizeof c, "%s / %s", a, b2); text(cr, c, bx, y + 84, 12.5, 600, F_SANS, C_TEXT, 1, 2, 0); }
+            fg_bar(cr, px, y + 96, pw, 4, st.pct / 100.0);
+
+            double gfrac = st.game_total > 0 ? (double)st.game_done / st.game_total : 0;
+            char rate[32]; fmt_rate(rate, sizeof rate, st.speed_bps);
+            if (st.game_total > 0) {
+                fmt_size(a, sizeof a, st.game_done); fmt_size(b2, sizeof b2, st.game_total);
+                g_snprintf(l2, sizeof l2, "Total : %s / ~%s (%.0f %%)  ·  %s  ·  %d connexion%s", a, b2, gfrac * 100, rate, st.conns, st.conns > 1 ? "s" : "");
+                if (st.speed_bps > 1024) { fmt_eta(c, sizeof c, (st.game_total - st.game_done) / st.speed_bps); g_strlcat(l2, "  ·  reste ~", sizeof l2); g_strlcat(l2, c, sizeof l2); }
+            } else g_snprintf(l2, sizeof l2, "%s  ·  %s", st.msg, rate);
+            text_fit(cr, l2, px, y + 124, 12.5, 600, F_SANS, C_TEXT, pw, 0);
+            fg_bar(cr, px, y + 136, pw, 6, gfrac);
+            if (outline_btn(cr, bx - 110, y + 12, 110, 28, "Pause", 12)) { fx_fg_cancel(); paused = TRUE; }
+            { char sp[520]; fg_short_path(st.dest[0] ? st.dest : dest, sp, sizeof sp); text_fit(cr, sp, px, y + 160, 11.5, 400, F_SANS, C_MUTE, pw, 0); }
+            schedule_redraw(500);
+        } else if (st.completed) {
+            char sp[520], dm[600]; fg_short_path(st.dest, sp, sizeof sp); g_snprintf(dm, sizeof dm, "✓  Toutes les parties sont téléchargées dans %s", sp);
+            text_fit(cr, dm, px, y + 84, 12.5, 600, F_SANS, C_OK, pw, 0);
+            text(cr, "Lance setup.exe depuis « Jeux Windows » (ou extrais d'abord la partie 1 si ce sont des .rar).", px, y + 106, 12, 400, F_SANS, C_MUTE, 1, 0, 0);
+            if (primary_btn(cr, bx - 190, y + 40, 190, 34, "Ouvrir le dossier")) open_path(st.dest);
+        } else if (busy_res) {
+            int dots = (int)(g_get_monotonic_time() / 400000) % 4;
+            char m[80]; g_snprintf(m, sizeof m, "Recherche des liens FuckingFast%.*s", dots, "...");
+            text(cr, m, px, y + 84, 12.5, 400, F_SANS, C_LABEL, 1, 0, 0);
+            schedule_redraw(400);
+        } else if (resolved && *rerr) {
+            text_fit(cr, rerr, px, y + 84, 12.5, 600, F_SANS, C_RED, pw - 140, 0);
+            text(cr, "Choisis un autre résultat, ou réessaie dans un instant.", px, y + 106, 12, 400, F_SANS, C_MUTE, 1, 0, 0);
+            if (outline_btn(cr, bx - 120, y + 40, 120, 30, "Réessayer", 12)) { gchar *u = g_strdup(page_url); fx_fg_resolve(u); g_free(u); }
+        } else if (resolved) {
+            char info[256];
+            if (nopt > 0) g_snprintf(info, sizeof info, "%d partie%s  ·  %d fichier%s optionnel%s ignoré%s (voix, bonus)", nfiles, nfiles > 1 ? "s" : "", nopt, nopt > 1 ? "s" : "", nopt > 1 ? "s" : "", nopt > 1 ? "s" : "");
+            else g_snprintf(info, sizeof info, "%d partie%s", nfiles, nfiles > 1 ? "s" : "");
+            text(cr, info, px, y + 84, 12.5, 400, F_SANS, C_LABEL, 1, 0, 0);
+            char sp[520], dl[600]; fg_short_path(dest, sp, sizeof sp); g_snprintf(dl, sizeof dl, "Dossier : %s", sp);
+            text_fit(cr, dl, px, y + 106, 12, 400, F_SANS, C_MUTE, pw - 230, 0);
+            if (st.error) text_fit(cr, st.msg, px, y + 126, 12, 600, F_SANS, C_RED, pw - 230, 0);
+            else if (paused) text(cr, "En pause : les parties et segments déjà reçus sont conservés.", px, y + 126, 12, 400, F_SANS, C_LABEL, 1, 0, 0);
+            if (outline_btn(cr, bx - 190, y + 86, 190, 28, "Changer de dossier…", 12)) pick_fg_folder();
+            const char *lbl = st.error || paused ? "Reprendre" : "Télécharger";
+            if (primary_btn(cr, bx - 190, y + 40, 190, 34, lbl)) {
+                paused = FALSE;
+                g_mkdir_with_parents(dest, 0755);
+                fx_fg_download(dest);
+                show_toast("Téléchargement lancé");
+            }
+        }
+        y += ch + 24;
+    }
+
+    /* ---- résultats de recherche ---- */
     FgSearchHit hits[MAXFG_RESULTS];
     int nhits = fx_fg_results(hits, MAXFG_RESULTS);
     gboolean searching = fx_fg_search_busy();
-    if (*q && searching) {
-        /* Recherche en cours */
-        text(cr, "Recherche en cours…", X0, cy + 14, 12.5, 400, F_SANS, C_MUTE, 1, 0, 0);
-        schedule_redraw(500);
-        cy += 40;
-    } else if (*q && nhits == 0) {
-        /* Recherche terminée, aucun résultat */
-        text(cr, "Aucun résultat trouvé. Essaie un autre terme.", X0, cy + 14, 12.5, 400, F_SANS, C_MUTE, 1, 0, 0);
-        cy += 40;
-    } else if (nhits > 0) {
-        double gap = 12;
-        int cols = grid_cols(CW, 260, gap);
-        double cw = (CW - (cols - 1) * gap) / cols;
-        for (int i = 0; i < nhits; i++) {
-            double x = X0 + (i % cols) * (cw + gap);
-            double ry = cy + (i / cols) * (98 + gap);
-            panel(cr, x, ry, cw, 98, FALSE);
-            text_fit(cr, hits[i].title, x + 14, ry + 28, 13.5, 600, F_SANS, C_TEXT, cw - 28, 0);
-            if (outline_btn(cr, x + 14, ry + 50, cw - 28, 28, "Sélectionner", 12)) {
-                fx_fg_resolve(hits[i].page_url);
-                char b[192]; g_snprintf(b, sizeof b, "Résolution de « %s »…", hits[i].title);
-                show_toast(b);
-            }
-        }
-        cy += ((nhits + cols - 1) / cols) * (98 + gap) + 12;
-    }
-
-
-    /* ---- Jeu sélectionné (résolution en cours ou terminée) ---- */
-    cy += 10;
-    section(cr, "Jeu sélectionné", X0, cy);
-    cy += 26;
-    gboolean resolved = fx_fg_resolved();
-    const char *gtitle = fx_fg_game_title();
-    int nfiles = fx_fg_file_count();
-    if (!resolved && !*gtitle) {
-        text(cr, "Sélectionne un jeu dans les résultats ci-dessus.", X0, cy + 14, 12.5, 400, F_SANS, C_MUTE, 1, 0, 0);
-        cy += 40;
-    } else if (!resolved) {
-        text(cr, "Résolution des liens en cours…", X0, cy + 14, 12.5, 400, F_SANS, C_MUTE, 1, 0, 0);
-        schedule_redraw(500);
-        cy += 40;
+    char qbuf[200];
+    g_snprintf(qbuf, sizeof qbuf, *q ? "Résultats pour « %s »" : "Rechercher un repack", q);
+    section(cr, qbuf, X0, y + 8);
+    y += 28;
+    if (!*q) {
+        panel(cr, X0, y, CW, 84, FALSE);
+        text(cr, "Lance une recherche pour trouver un jeu (ex. « elden ring »).", X0 + 22, y + 30, 13, 400, F_SANS, C_LABEL, 1, 0, 0);
+        if (primary_btn(cr, X0 + 22, y + 44, 190, 30, "Rechercher un jeu…")) { ask_text(6, 0, "Rechercher un repack FitGirl", q); return; }
+        y += 84;
+    } else if (searching) {
+        int dots = (int)(g_get_monotonic_time() / 400000) % 4;
+        char m[80]; g_snprintf(m, sizeof m, "Recherche en cours%.*s", dots, "...");
+        text(cr, m, X0, y + 14, 12.5, 400, F_SANS, C_MUTE, 1, 0, 0);
+        schedule_redraw(400);
+        y += 40;
+    } else if (nhits == 0) {
+        text(cr, "Aucun résultat. Essaie un autre terme (titre en anglais).", X0, y + 14, 12.5, 400, F_SANS, C_MUTE, 1, 0, 0);
+        y += 40;
     } else {
-        char gb[200];
-        g_snprintf(gb, sizeof gb, "%s — %d partie(s)", *gtitle ? gtitle : "(titre inconnu)", nfiles);
-        text(cr, gb, X0, cy + 14, 13.5, 600, F_SANS, C_TEXT, 1, 0, 0);
-        cy += 36;
-
-        /* Destination par défaut */
-        static char fg_dest[512];
-        if (!fg_dest[0]) g_snprintf(fg_dest, sizeof fg_dest, "%s/Games/FitGirl", g_get_home_dir());
-
-        FgDlStatus st = fx_fg_dl_status();
-        if (!st.active && !st.completed) {
-            if (outline_btn(cr, X0, cy, 200, 30, "Télécharger ici →  ~/Games/FitGirl", 12))
-                fx_fg_download(fg_dest);
-            cy += 44;
-        } else if (st.active) {
-            /* Barre de progression partie courante */
-            char pb[200];
-            g_snprintf(pb, sizeof pb, "Partie %d/%d — %s", st.file_done + 1, st.file_count, st.msg);
-            text_fit(cr, pb, X0, cy + 14, 12.5, 400, F_SANS, C_TEXT, CW, 0);
-            cy += 28;
-            cairo_rectangle(cr, X0, cy, CW, 6); rgba(cr, 0x1e1e22, 1); cairo_fill(cr);
-            cairo_rectangle(cr, X0, cy, CW * CLAMP(st.pct, 0, 100) / 100.0, 6); rgba(cr, C_RED, 1); cairo_fill(cr);
-            cy += 16;
-            /* Progression globale si connue */
-            if (st.game_total > 0) {
-                double gpct = (double)st.game_done / st.game_total * 100.0;
-                char gb2[80]; g_snprintf(gb2, sizeof gb2, "Total : %.1f %%", gpct);
-                text(cr, gb2, X0, cy + 14, 12, 400, F_SANS, C_MUTE, 1, 0, 0);
-                cy += 28;
+        double gap = 12, cardh = 96;
+        int cols = grid_cols(CW, 280, gap);
+        double cw = (CW - (cols - 1) * gap) / cols;
+        gboolean locked = st.active;            /* pas de changement de jeu pendant un téléchargement */
+        for (int i = 0; i < nhits; i++) {
+            double x = X0 + (i % cols) * (cw + gap), ry = y + (i / cols) * (cardh + gap);
+            gboolean sel = !strcmp(hits[i].page_url, page_url);
+            panel(cr, x, ry, cw, cardh, sel);
+            if (sel) { cairo_rectangle(cr, x, ry, 3, cardh); rgba(cr, C_RED, 1); cairo_fill(cr); }
+            text_fit(cr, hits[i].title, x + 16, ry + 26, 13.5, 600, F_SANS, C_TEXT, cw - 32, 0);
+            if (sel) text(cr, busy_res ? "Recherche des liens…" : "Sélectionné", x + 16, ry + 66, 12, 600, F_SANS, C_RED, 1, 0, 0);
+            else if (!locked && outline_btn(cr, x + 16, ry + 52, cw - 32, 28, "Sélectionner", 12)) {
+                paused = FALSE;
+                fx_fg_resolve(hits[i].page_url);
+                if (area) gtk_widget_queue_draw(area);
+            } else if (locked) {                   /* bouton grisé : un seul téléchargement à la fois */
+                cairo_rectangle(cr, x + 16.5, ry + 52.5, cw - 33, 27); rgba(cr, C_LINE2, 1); cairo_set_line_width(cr, 1); cairo_stroke(cr);
+                text(cr, "Sélectionner", x + cw / 2, ry + 66, 12, 600, F_SANS, C_MUTE, 1, 1, 0);
             }
-            if (outline_btn(cr, X0, cy, 100, 28, "Annuler", 12)) fx_fg_cancel();
-            cy += 44;
-            schedule_redraw(500);
-        } else if (st.completed) {
-            char dm[256]; g_snprintf(dm, sizeof dm, "✓ %s", st.msg);
-            text(cr, dm, X0, cy + 14, 13, 500, F_SANS, C_OK, 1, 0, 0);
-            if (outline_btn(cr, X0 + 200, cy, 160, 28, "Ouvrir le dossier", 12))
-                open_path(st.dest);
-            cy += 44;
-        } else if (st.error) {
-            text_fit(cr, st.msg, X0, cy + 14, 12.5, 400, F_SANS, C_RED, CW, 0);
-            if (outline_btn(cr, X0, cy + 32, 140, 28, "Réessayer", 12))
-                fx_fg_download(fg_dest);
-            cy += 74;
         }
+        y += ((nhits + cols - 1) / cols) * (cardh + gap);
     }
 
-    page_h = cy + 24;
+    page_h = y + 24;
 }
 
 static void chrome(cairo_t *cr) {

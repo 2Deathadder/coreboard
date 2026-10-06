@@ -14,6 +14,7 @@ import time
 import socket
 import ssl
 import subprocess
+import threading
 import shutil
 import urllib.request
 import urllib.error
@@ -172,54 +173,67 @@ def decrypt_fitgirl_paste(paste_url):
 # -----------------------------------------------------------------------------
 # Résolution d'une source (Paste, fuckingfast direct, ou page de jeu FitGirl)
 # -----------------------------------------------------------------------------
+FF_LINK_RE = re.compile(r'https?://fuckingfast\.co/[^\s"\'<>]+')
+
+
+def _ff_links(text):
+    """Liens fuckingfast.co uniques, dans l'ordre d'apparition, nettoyés de la ponctuation finale."""
+    out = []
+    for l in FF_LINK_RE.findall(text):
+        l = html_unescape(l).rstrip(".,;)\"'>")
+        if l not in out:
+            out.append(l)
+    return out
+
+
+def _is_optional(name):
+    # FitGirl : « fg-optional-* » = voix d'autres langues, bonus… ; le jeu s'installe sans
+    return name.lower().startswith("fg-optional-")
+
+
 def resolve_game_source(source_url):
     """
     Prend en entrée une URL de paste FitGirl, une URL fuckingfast.co directe,
     ou une URL de page de jeu fitgirl-repacks.site,
     et renvoie les métadonnées et la liste des fichiers avec leurs liens.
+    Une page FitGirl propose plusieurs hébergeurs (DataNodes, FuckingFast, FileKeeper…) : seuls les liens
+    FuckingFast sont exploitables. Ordre : liens FuckingFast de la page, puis paste « FuckingFast », puis tous les pastes.
     """
     links = []
     game_title = "Jeu FitGirl"
 
-    # Si c'est une URL de page fitgirl-repacks.site (ex: https://fitgirl-repacks.site/elden-ring/)
     if "fitgirl-repacks.site" in source_url and "paste.fitgirl-repacks.site" not in source_url:
         req = urllib.request.Request(source_url, headers=HEADERS_BROWSER)
-        with urllib.request.urlopen(req, timeout=12) as resp:
+        with urllib.request.urlopen(req, timeout=15) as resp:
             html = resp.read().decode("utf-8", errors="replace")
-        
-        # Extrait le titre
-        m_t = re.search(r'<h1 class="entry-title"[^>]*>(.*?)</h1>', html)
+
+        m_t = re.search(r'<h1 class="entry-title"[^>]*>(.*?)</h1>', html, re.S)
         if m_t:
             game_title = html_unescape(re.sub(r'<[^>]+>', '', m_t.group(1)).strip())
-            
-        # Cherche les liens de paste fuckingfast
-        pastes = re.findall(r'https?://paste\.fitgirl-repacks\.site/\?[^\s"\'<>]+', html)
-        if pastes:
-            source_url = pastes[0] # Utilise le premier paste
-        else:
-            ffs = re.findall(r'https?://fuckingfast\.co/[^\s"\'<>]+', html)
-            if ffs:
-                links = list(dict.fromkeys(ffs))
 
-    if "paste.fitgirl-repacks.site" in source_url:
-        plaintext = decrypt_fitgirl_paste(source_url)
-        # Trouve tous les liens fuckingfast.co
-        found = re.findall(r'https?://fuckingfast\.co/[^\s"\'<>]+', plaintext)
-        # Nettoie les liens
-        for l in found:
-            clean_l = l.rstrip(".,;)\"'>")
-            if clean_l not in links:
-                links.append(clean_l)
+        links = _ff_links(html)
+        if not links:
+            pastes = [html_unescape(u) for u in re.findall(r'https?://paste\.fitgirl-repacks\.site/\?[^\s"\'<>]+', html)]
+            pastes = list(dict.fromkeys(pastes))
+            labelled = [html_unescape(u) for u in re.findall(
+                r'<a[^>]+href="(https?://paste\.fitgirl-repacks\.site/\?[^"]+)"[^>]*>[^<]*FuckingFast', html, re.I)]
+            for p in labelled + [p for p in pastes if p not in labelled]:
+                try:
+                    links = _ff_links(decrypt_fitgirl_paste(p))
+                except Exception:
+                    continue
+                if links:
+                    break
+    elif "paste.fitgirl-repacks.site" in source_url:
+        links = _ff_links(decrypt_fitgirl_paste(source_url))
     elif "fuckingfast.co" in source_url:
-        links.append(source_url.strip())
+        links = [source_url.strip()]
 
     if not links:
-        raise ValueError("Aucun lien fuckingfast.co trouvé dans cette source")
+        raise ValueError("Aucun lien FuckingFast pour ce repack (seuls d'autres hébergeurs sont proposés)")
 
-    # Détecte le titre du jeu à partir du premier fragment d'URL
     if not game_title or game_title == "Jeu FitGirl":
-        first_link = links[0]
-        m_name = re.search(r'#([^#]+)$', first_link)
+        m_name = re.search(r'#([^#]+)$', links[0])
         if m_name:
             raw_name = m_name.group(1)
             raw_name = re.sub(r'_*--_*fitgirl-repacks\.site_*--_*', '', raw_name, flags=re.I)
@@ -229,29 +243,24 @@ def resolve_game_source(source_url):
     if not game_title:
         game_title = "Téléchargement FitGirl"
 
-    # Prépare la liste des fichiers
-    files = []
-    for idx, l in enumerate(links):
+    files, optional = [], []
+    for l in links:
+        idx = len(files) + len(optional)
         fname = f"part{idx+1:02d}.bin"
         m_f = re.search(r'#([^#]+)$', l)
         if m_f:
-            fname = m_f.group(1)
-            # Nettoie pour le nom de fichier local
-            fname = re.sub(r'--_*fitgirl-repacks\.site_*--', '', fname, flags=re.I)
-            fname = re.sub(r'^[_\s]+|[_\s]+$', '', fname)
-        files.append({
-            "index": idx,
-            "name": fname,
-            "source_url": l,
-            "direct_url": "", # Sera résolu à la volée avant de télécharger
-            "size": 0
-        })
+            fname = m_f.group(1).strip()        # nom d'origine : les volumes RAR s'enchaînent par leur nom
+        entry = {"name": fname, "source_url": l, "direct_url": ""}
+        (optional if _is_optional(fname) else files).append(entry)
+    for i, f in enumerate(files):
+        f["index"] = i
 
     return {
         "title": game_title,
         "source_url": source_url,
         "file_count": len(files),
-        "files": files
+        "files": files,
+        "optional_files": optional,
     }
 
 # -----------------------------------------------------------------------------
@@ -340,74 +349,286 @@ def check_storage(directory_path, required_bytes=0):
         }
 
 # -----------------------------------------------------------------------------
-# Téléchargeur multi-fichiers avec reprise (Range) et rapport JSON en direct
+# Téléchargeur segmenté (même méthode que Flux)
+#   - sonde de taille par « Range: bytes=0-0 » ;
+#   - fichier « .part » préalloué, écrit par plusieurs connexions en parallèle (une plage d'octets chacune) ;
+#   - découpage dynamique : une connexion libre prend la moitié du plus gros reste ;
+#   - relances progressives par segment, lien direct re-résolu s'il a expiré ;
+#   - repli sur une seule connexion si le serveur ignore les plages ;
+#   - état des segments sauvegardé (« .cbseg ») : reprise exacte après coupure, annulation ou redémarrage.
 # -----------------------------------------------------------------------------
-def download_stream(direct_url, target_file, file_name, file_idx, total_files, done_before=0):
-    """
-    Télécharge un fichier avec support HTTP Range et émet des lignes JSON pour l'UI.
-    Un fichier déjà présent est repris là où il s'est arrêté ; s'il est complet, le serveur répond 416.
-    """
-    target = Path(target_file)
-    existing_bytes = target.stat().st_size if target.exists() else 0
+SEG_CONNS = max(1, min(32, int(os.environ.get("COREBOARD_FG_CONNS", "8"))))
+MIN_SEG = 4 << 20            # pas de segment initial sous 4 Mo
+SPLIT_MIN = 8 << 20          # reste minimal pour un découpage dynamique
+MAX_RETRIES = 8
+CHUNK = 256 << 10
 
-    headers = dict(HEADERS_BROWSER)
-    if existing_bytes > 0:
-        headers["Range"] = f"bytes={existing_bytes}-"
 
-    req = urllib.request.Request(direct_url, headers=headers)
-    t0 = time.time()
-    last_emit = t0
-    bytes_this_session = 0
+class LinkExpired(Exception):
+    pass
 
+
+class NoRanges(Exception):
+    pass
+
+
+def probe(url):
+    """Renvoie (taille, plages_acceptées). Taille -1 si inconnue."""
+    req = urllib.request.Request(url, headers={**HEADERS_BROWSER, "Range": "bytes=0-0"})
     try:
+        with urllib.request.urlopen(req, timeout=20) as r:
+            if r.status == 206:
+                m = re.search(r'/(\d+)\s*$', r.headers.get("Content-Range", ""))
+                if m:
+                    return int(m.group(1)), True
+            cl = r.headers.get("Content-Length")
+            return (int(cl) if cl and r.status == 200 else -1), False
+    except urllib.error.HTTPError as e:
+        if e.code in (401, 403, 404, 410):
+            raise LinkExpired(f"HTTP {e.code}") from e
+        raise
+
+
+class Seg:
+    __slots__ = ("pos", "end", "active", "retries", "retry_at", "err")
+
+    def __init__(self, pos, end):
+        self.pos, self.end = pos, end
+        self.active, self.retries, self.retry_at, self.err = False, 0, 0.0, None
+
+
+class SegmentedDownload:
+    def __init__(self, target, get_url, file_name, file_idx, total_files, done_before):
+        self.target = Path(target)
+        self.part = Path(str(target) + ".part")
+        self.state = Path(str(target) + ".cbseg")
+        self.get_url = get_url
+        self.file_name, self.file_idx, self.total_files, self.done_before = file_name, file_idx, total_files, done_before
+        self.lock = threading.Lock()
+        self.stop = False
+        self.segs = []
+        self.size = -1
+        self.ranges = False
+        self.url = None
+        self.fd = -1
+
+    # --- état persistant
+    def _load_state(self):
         try:
-            resp_cm = urllib.request.urlopen(req, timeout=20)
-        except urllib.error.HTTPError as e:
-            if e.code == 416 and existing_bytes > 0:   # plage hors fichier : déjà entièrement téléchargé
-                return existing_bytes
-            raise
-        with resp_cm as resp:
-            content_length = resp.headers.get("Content-Length")
-            file_total = int(content_length) + existing_bytes if content_length else 0
+            st = json.loads(self.state.read_text())
+            if st.get("size") == self.size and self.part.exists() and self.part.stat().st_size == self.size:
+                return [Seg(int(p), int(e)) for p, e in st["segs"] if int(p) < int(e)]
+        except Exception:
+            pass
+        return None
 
-            # Si le serveur renvoie 200 au lieu de 206 (ne supporte pas Range), repartir de zéro
-            mode = "ab" if resp.status == 206 else "wb"
-            if resp.status == 200 and existing_bytes > 0:
-                existing_bytes = 0
-                file_total = int(content_length) if content_length else 0
-            # taille totale estimée : les parties FitGirl ont toutes la même taille (sauf la dernière)
-            total_all = done_before + file_total * (total_files - file_idx) if file_total else 0
+    def _save_state(self):
+        with self.lock:
+            segs = [[s.pos, s.end] for s in self.segs if s.pos < s.end]
+        tmp = Path(str(self.state) + ".tmp")
+        tmp.write_text(json.dumps({"size": self.size, "segs": segs}))
+        os.replace(tmp, self.state)
 
-            with open(target, mode) as f:
-                while True:
-                    chunk = resp.read(128 * 1024) # Chunks de 128 Ko
+    def _layout(self):
+        n = max(1, min(SEG_CONNS, self.size // MIN_SEG))
+        per = self.size // n
+        return [Seg(i * per, self.size if i == n - 1 else (i + 1) * per) for i in range(n)]
+
+    # --- une connexion
+    def _worker(self, seg):
+        try:
+            with self.lock:
+                start, end = seg.pos, seg.end
+            headers = dict(HEADERS_BROWSER)
+            if self.ranges:
+                headers["Range"] = f"bytes={start}-{end - 1}"
+            req = urllib.request.Request(self.url, headers=headers)
+            try:
+                r = urllib.request.urlopen(req, timeout=30)
+            except urllib.error.HTTPError as e:
+                if e.code in (401, 403, 404, 410):
+                    raise LinkExpired(f"HTTP {e.code}") from e
+                raise
+            with r:
+                if self.ranges and r.status != 206:
+                    raise NoRanges()
+                while not self.stop:
+                    chunk = r.read(CHUNK)
                     if not chunk:
                         break
-                    f.write(chunk)
-                    bytes_this_session += len(chunk)
-                    current_done = existing_bytes + bytes_this_session
+                    with self.lock:
+                        room = seg.end - seg.pos
+                        if room <= 0 or seg not in self.segs:   # segment abandonné (repli en flux unique)
+                            break
+                        data = chunk[:room] if len(chunk) > room else chunk
+                        os.pwrite(self.fd, data, seg.pos)
+                        seg.pos += len(data)
+                        if seg.pos >= seg.end:
+                            break
+            with self.lock:
+                if seg not in self.segs:
+                    return
+                if seg.end == float("inf") and not self.stop:     # taille inconnue : fin du flux = fin du fichier
+                    seg.end = seg.pos
+                elif seg.pos < seg.end and not self.stop:
+                    raise ConnectionError("connexion coupée avant la fin du segment")
+        except Exception as e:  # noqa: BLE001 — traité par la boucle principale
+            seg.err = e
+        finally:
+            seg.active = False
 
-                    now = time.time()
-                    if now - last_emit >= 0.5: # Met à jour toutes les 500ms
-                        speed = bytes_this_session / max(0.1, now - t0)
-                        pct = (current_done / file_total * 100.0) if file_total > 0 else 0
-                        emit_json({
-                            "event": "progress",
-                            "file": file_name,
-                            "file_index": file_idx,
-                            "file_count": total_files,
-                            "file_done": current_done,
-                            "file_total": file_total,
-                            "game_done": done_before + current_done,
-                            "game_total": total_all,
-                            "speed_bps": speed,
-                            "pct": round(pct, 1)
-                        })
-                        last_emit = now
+    def _start(self, seg):
+        seg.active, seg.err = True, None
+        threading.Thread(target=self._worker, args=(seg,), daemon=True).start()
 
-        return target.stat().st_size
-    except Exception as e:
-        raise RuntimeError(f"Erreur téléchargement de {file_name}: {e}") from e
+    def _done_bytes(self):
+        if self.size <= 0:
+            return sum(s.pos for s in self.segs)
+        return self.size - sum(max(0, s.end - s.pos) for s in self.segs)
+
+    def run(self):
+        self.url = self.get_url(False)
+        for attempt in range(4):
+            try:
+                self.size, self.ranges = probe(self.url)
+                break
+            except LinkExpired:
+                self.url = self.get_url(True)
+            except Exception:
+                if attempt == 3:
+                    raise
+                time.sleep(2 * (attempt + 1))
+        if self.size <= 0:
+            self.ranges = False
+
+        # fichier déjà complet, ou téléchargé partiellement par l'ancienne méthode (flux unique)
+        if self.target.exists() and not self.part.exists():
+            have = self.target.stat().st_size
+            if self.size > 0 and have == self.size:
+                return have, True
+            if self.ranges and 0 < have < self.size:
+                os.replace(self.target, self.part)
+                self.segs = [Seg(have, self.size)]
+        if not self.segs:
+            self.segs = (self._load_state() if self.ranges else None) or \
+                        (self._layout() if self.ranges else [Seg(0, self.size if self.size > 0 else float("inf"))])
+
+        self.fd = os.open(self.part, os.O_RDWR | os.O_CREAT | os.O_CLOEXEC, 0o644)
+        try:
+            if not self.ranges:
+                os.ftruncate(self.fd, 0)
+            elif os.fstat(self.fd).st_size != self.size:
+                os.ftruncate(self.fd, self.size)
+                try:
+                    os.posix_fallocate(self.fd, 0, self.size)   # réserve l'espace : pas d'échec en cours de route
+                except OSError:
+                    pass
+            self._loop()
+            os.fsync(self.fd)
+        finally:
+            os.close(self.fd)
+            self.fd = -1
+
+        done = self._done_bytes()
+        if self.size > 0 and done < self.size:
+            raise RuntimeError("téléchargement incomplet")
+        os.replace(self.part, self.target)
+        try:
+            self.state.unlink()
+        except FileNotFoundError:
+            pass
+        return self.target.stat().st_size, False
+
+    def _loop(self):
+        last_emit = t_prev = time.time()
+        last_save = 0.0                                     # premier état écrit tout de suite
+        done_prev = self._done_bytes()
+        speed = 0.0
+        relink = False
+        while True:
+            now = time.time()
+            fatal = None
+            with self.lock:
+                for s in self.segs:                         # bilan des connexions terminées
+                    if s.active or s.err is None:
+                        continue
+                    e, s.err = s.err, None
+                    if isinstance(e, NoRanges):             # le serveur ignore les plages : une seule connexion
+                        self.ranges = False
+                        self.segs = [Seg(0, self.size if self.size > 0 else float("inf"))]
+                        os.ftruncate(self.fd, 0)
+                        break
+                    if isinstance(e, LinkExpired):
+                        relink = True
+                    s.retries += 1
+                    if s.retries > MAX_RETRIES:
+                        fatal = e
+                    s.retry_at = now + min(30, 2 ** s.retries)
+                    if not self.ranges and s.pos > 0:       # flux unique non reprenable : on repart de zéro
+                        s.pos = 0
+                        os.ftruncate(self.fd, 0)
+                pending = [s for s in self.segs if s.pos < s.end]
+                if not pending and not any(s.active for s in self.segs):
+                    break
+            if fatal is not None:
+                self.stop = True
+                self._save_state()
+                raise RuntimeError(f"échec après {MAX_RETRIES} tentatives : {fatal}")
+            if relink:
+                relink = False
+                try:
+                    self.url = self.get_url(True)
+                except Exception:
+                    pass
+
+            with self.lock:
+                active = sum(s.active for s in self.segs)
+                conns = SEG_CONNS if self.ranges else 1
+                for s in self.segs:
+                    if active >= conns:
+                        break
+                    if not s.active and s.pos < s.end and s.retry_at <= now:
+                        self._start(s)
+                        active += 1
+                # découpage dynamique : une connexion libre prend la moitié du plus gros reste
+                while self.ranges and active < conns:
+                    big = max((s for s in self.segs if s.active and s.end - s.pos > SPLIT_MIN),
+                              key=lambda s: s.end - s.pos, default=None)
+                    if big is None:
+                        break
+                    mid = big.pos + (big.end - big.pos) // 2
+                    n = Seg(mid, big.end)
+                    big.end = mid
+                    self.segs.append(n)
+                    self._start(n)
+                    active += 1
+
+            if now - last_emit >= 0.5:
+                done = self._done_bytes()
+                dt = max(0.05, now - t_prev)
+                speed = speed * 0.5 + 0.5 * max(0, done - done_prev) / dt
+                done_prev, t_prev = done, now
+                total = self.size if self.size > 0 else 0
+                emit_json({
+                    "event": "progress",
+                    "file": self.file_name,
+                    "file_index": self.file_idx,
+                    "file_count": self.total_files,
+                    "file_done": done,
+                    "file_total": total,
+                    "game_done": self.done_before + done,
+                    # estimation : les parties FitGirl ont toutes la même taille (sauf la dernière)
+                    "game_total": self.done_before + total * (self.total_files - self.file_idx) if total else 0,
+                    "speed_bps": speed,
+                    "conns": active,
+                    "pct": round(done * 100.0 / total, 1) if total else 0,
+                })
+                last_emit = now
+            if self.ranges and now - last_save >= 1:
+                self._save_state()
+                last_save = now
+            time.sleep(0.2)
+
 
 def safe_filename(name, idx):
     """
@@ -420,7 +641,7 @@ def safe_filename(name, idx):
 
 def run_download_job(resolved_json_path, target_dir):
     """
-    Lit le fichier de description résolu et télécharge séquentiellement chaque partie.
+    Lit le fichier de description résolu et télécharge chaque partie (segmentée, reprenable).
     """
     with open(resolved_json_path, "r", encoding="utf-8") as f:
         job = json.load(f)
@@ -432,28 +653,28 @@ def run_download_job(resolved_json_path, target_dir):
     total_files = len(files)
     game_title = job.get("title", "Jeu")
 
-    emit_json({"event": "job_start", "title": game_title, "file_count": total_files, "dest": str(target_path)})
+    emit_json({"event": "job_start", "title": game_title, "file_count": total_files, "dest": str(target_path),
+               "conns": SEG_CONNS})
 
     total_done = 0
     for idx, item in enumerate(files):
         fname = safe_filename(item.get("name", ""), idx)
-        local_dest = target_path / fname
         source_url = item.get("source_url", "")
-        direct_url = item.get("direct_url", "")
-        # Un fichier déjà présent n'est jamais supposé complet : download_stream le reprend via Range
-        # (réponse 416 = déjà terminé), ce qui évite de garder une partie interrompue en cours de route.
 
-        # Résolution du lien direct à la volée pour éviter les URLs expirées
-        if not direct_url:
-            emit_json({"event": "resolving_link", "file": fname, "file_index": idx})
-            direct_url = get_fuckingfast_direct_link(source_url)
-            item["direct_url"] = direct_url
+        def get_url(force, item=item, fname=fname, idx=idx):
+            # lien direct résolu à la demande (il expire) ; force = re-résolution après un refus du serveur
+            if force or not item.get("direct_url"):
+                emit_json({"event": "resolving_link", "file": fname, "file_index": idx})
+                item["direct_url"] = get_fuckingfast_direct_link(source_url)
+            return item["direct_url"]
 
         emit_json({"event": "file_start", "file": fname, "file_index": idx, "file_count": total_files})
-        had = local_dest.stat().st_size if local_dest.exists() else 0
-        fsize = download_stream(direct_url, local_dest, fname, idx, total_files, done_before=total_done)
+        try:
+            fsize, cached = SegmentedDownload(target_path / fname, get_url, fname, idx, total_files, total_done).run()
+        except Exception as e:
+            raise RuntimeError(f"{fname} : {e}") from e
         total_done += fsize
-        emit_json({"event": "file_cached" if had and had == fsize else "file_done",
+        emit_json({"event": "file_cached" if cached else "file_done",
                    "file": fname, "file_index": idx, "file_count": total_files})
 
     emit_json({"event": "job_completed", "title": game_title, "total_bytes": total_done, "dest": str(target_path)})
@@ -541,7 +762,7 @@ def main():
         if cmd == "resolve":
             url = sys.argv[2]
             res = resolve_game_source(url)
-            print(json.dumps(res, indent=2))
+            print(json.dumps(res))
 
         elif cmd == "search":
             q = sys.argv[2] if len(sys.argv) > 2 else ""

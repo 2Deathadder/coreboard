@@ -1216,7 +1216,8 @@ static gchar *fg_run(const char *const *args) {
     g_spawn_sync(NULL, (char **)argv, NULL, G_SPAWN_SEARCH_PATH | G_SPAWN_STDERR_TO_DEV_NULL,
                  NULL, NULL, &out, NULL, &st, NULL);
     g_free(argv);
-    if (st || !out || !*out) { g_free(out); return NULL; }
+    /* en cas d'échec le helper écrit aussi {"error": …} sur stdout : on le garde pour l'afficher */
+    if (!out || !*out) { g_free(out); return NULL; }
     return out;
 }
 
@@ -1303,56 +1304,77 @@ const char *fx_fg_query(void) {                      /* thread principal uniquem
 /* ---- Résolution d'URL → liste de fichiers ---- */
 static GMutex fg_resolve_lock;
 static gboolean fg_resolved, fg_resolve_busy, fg_resolve_error;
-static char fg_game_title[128];
+static char fg_game_title[128], fg_resolve_msg[200], fg_page_url[512];
+static int fg_optional_count, fg_resolve_gen;
 static gchar *fg_resolved_json;    /* JSON complet du job (taille libre : des dizaines de parties) */
 static int fg_file_count_cache;
 
-typedef struct { char url[512]; } FgResolveArg;
+typedef struct { char url[512]; int gen; } FgResolveArg;
 
 static gpointer fg_resolve_thread(gpointer d) {
     FgResolveArg *a = d;
     const char *args[] = {"resolve", a->url, NULL};
     gchar *out = fg_run(args);
+    int gen = a->gen;
     g_free(a);
-    gboolean ok = FALSE; char title[128] = ""; int nf = 0; gchar *jbuf = NULL;
+    gboolean ok = FALSE; char title[128] = "", err[200] = ""; int nf = 0, nopt = 0; gchar *jbuf = NULL;
     if (out) {
         JsonParser *jp = json_parser_new();
-        if (json_parser_load_from_data(jp, out, -1, NULL)) {
-            JsonNode *root = json_parser_get_root(jp);
-            if (JSON_NODE_HOLDS_OBJECT(root)) {
-                JsonObject *o = json_node_get_object(root);
-                const char *t = jstr(o, "title");
-                if (*t) { g_strlcpy(title, t, sizeof title); ok = TRUE; }
-                nf = json_object_has_member(o, "file_count") ? (int)json_object_get_int_member(o, "file_count") : 0;
-                jbuf = g_strdup(out);
-            }
-        }
+        if (json_parser_load_from_data(jp, out, -1, NULL) && JSON_NODE_HOLDS_OBJECT(json_parser_get_root(jp))) {
+            JsonObject *o = json_node_get_object(json_parser_get_root(jp));
+            const char *t = jstr(o, "title");
+            nf = json_object_has_member(o, "file_count") ? (int)json_object_get_int_member(o, "file_count") : 0;
+            if (json_object_has_member(o, "optional_files")) nopt = (int)json_array_get_length(json_object_get_array_member(o, "optional_files"));
+            if (*t && nf > 0) { g_strlcpy(title, t, sizeof title); ok = TRUE; jbuf = g_strdup(out); }
+            else g_strlcpy(err, *jstr(o, "error") ? jstr(o, "error") : "Aucun fichier à télécharger pour ce repack", sizeof err);
+        } else g_strlcpy(err, "Réponse illisible du helper FitGirl", sizeof err);
         g_object_unref(jp); g_free(out);
-    }
+    } else g_strlcpy(err, "Impossible de lancer fistgirl_helper.py (python3 installé ?)", sizeof err);
     g_mutex_lock(&fg_resolve_lock);
-    fg_resolved = TRUE; fg_resolve_error = !ok; fg_resolve_busy = FALSE;
-    if (ok) {
-        g_strlcpy(fg_game_title, title, sizeof fg_game_title);
-        g_free(fg_resolved_json); fg_resolved_json = jbuf; jbuf = NULL;
-        fg_file_count_cache = nf;
+    if (gen == fg_resolve_gen) {                         /* une sélection plus récente remplace celle-ci */
+        fg_resolved = TRUE; fg_resolve_error = !ok; fg_resolve_busy = FALSE;
+        g_strlcpy(fg_resolve_msg, err, sizeof fg_resolve_msg);
+        if (ok) {
+            g_strlcpy(fg_game_title, title, sizeof fg_game_title);
+            g_free(fg_resolved_json); fg_resolved_json = jbuf; jbuf = NULL;
+            fg_file_count_cache = nf; fg_optional_count = nopt;
+        }
     }
     g_mutex_unlock(&fg_resolve_lock);
     g_free(jbuf);
     return NULL;
 }
 
+static void fg_dl_reset_idle(void);
+
 void fx_fg_resolve(const char *url) {
+    fg_dl_reset_idle();                                  /* l'état terminé/erreur concernait le jeu précédent */
     g_mutex_lock(&fg_resolve_lock);
     fg_resolved = FALSE; fg_resolve_error = FALSE; fg_resolve_busy = TRUE;
-    fg_game_title[0] = '\0'; fg_file_count_cache = 0;
+    fg_game_title[0] = '\0'; fg_resolve_msg[0] = 0; fg_file_count_cache = 0; fg_optional_count = 0;
+    g_clear_pointer(&fg_resolved_json, g_free);
+    g_strlcpy(fg_page_url, url, sizeof fg_page_url);
+    int gen = ++fg_resolve_gen;
     g_mutex_unlock(&fg_resolve_lock);
     FgResolveArg *a = g_new0(FgResolveArg, 1);
-    g_strlcpy(a->url, url, sizeof a->url);
+    g_strlcpy(a->url, url, sizeof a->url); a->gen = gen;
     g_thread_unref(g_thread_new("coreboard-fg-resolve", fg_resolve_thread, a));
 }
 
 gboolean fx_fg_resolved(void) { g_mutex_lock(&fg_resolve_lock); gboolean r = fg_resolved; g_mutex_unlock(&fg_resolve_lock); return r; }
 int      fx_fg_file_count(void) { g_mutex_lock(&fg_resolve_lock); int n = fg_file_count_cache; g_mutex_unlock(&fg_resolve_lock); return n; }
+int      fx_fg_optional_count(void) { g_mutex_lock(&fg_resolve_lock); int n = fg_optional_count; g_mutex_unlock(&fg_resolve_lock); return n; }
+gboolean fx_fg_resolve_busy(void) { g_mutex_lock(&fg_resolve_lock); gboolean b = fg_resolve_busy; g_mutex_unlock(&fg_resolve_lock); return b; }
+const char *fx_fg_resolve_error(void) {              /* thread principal uniquement */
+    static char m[200];
+    g_mutex_lock(&fg_resolve_lock); g_strlcpy(m, fg_resolve_msg, sizeof m); g_mutex_unlock(&fg_resolve_lock);
+    return m;
+}
+const char *fx_fg_page_url(void) {                   /* thread principal uniquement */
+    static char u[512];
+    g_mutex_lock(&fg_resolve_lock); g_strlcpy(u, fg_page_url, sizeof u); g_mutex_unlock(&fg_resolve_lock);
+    return u;
+}
 const char *fx_fg_game_title(void) {                 /* thread principal uniquement */
     static char t[128];
     g_mutex_lock(&fg_resolve_lock); g_strlcpy(t, fg_game_title, sizeof t); g_mutex_unlock(&fg_resolve_lock);
@@ -1365,6 +1387,12 @@ static FgDlStatus fg_dl;
 static GSubprocess *fg_dl_proc;     /* processus du helper en cours (protégé par fg_dl_lock) */
 static gboolean fg_dl_cancelled;
 
+
+static void fg_dl_reset_idle(void) {
+    g_mutex_lock(&fg_dl_lock);
+    if (!fg_dl.active && !fg_dl_proc) memset(&fg_dl, 0, sizeof fg_dl);
+    g_mutex_unlock(&fg_dl_lock);
+}
 
 FgDlStatus fx_fg_dl_status(void) {
     g_mutex_lock(&fg_dl_lock); FgDlStatus s = fg_dl; g_mutex_unlock(&fg_dl_lock); return s;
@@ -1386,23 +1414,29 @@ static void fg_parse_event(const char *line) {
         fg_dl.file_count = json_object_has_member(o, "file_count") ? (int)json_object_get_int_member(o, "file_count") : 0;
         fg_dl.file_done = 0; fg_dl.active = TRUE; fg_dl.completed = FALSE; fg_dl.error = FALSE;
         g_strlcpy(fg_dl.msg, "Démarrage…", sizeof fg_dl.msg);
-    } else if (!g_strcmp0(ev, "file_start") || !g_strcmp0(ev, "resolving_link")) {
+    } else if (!g_strcmp0(ev, "resolving_link")) {
+        g_strlcpy(fg_dl.file_name, jstr(o, "file"), sizeof fg_dl.file_name);
+        fg_dl.resolving = TRUE;
+        g_strlcpy(fg_dl.msg, "Obtention du lien de téléchargement…", sizeof fg_dl.msg);
+    } else if (!g_strcmp0(ev, "file_start")) {
         g_strlcpy(fg_dl.file_name, jstr(o, "file"), sizeof fg_dl.file_name);
         fg_dl.file_current = json_object_has_member(o, "file_index") ? (int)json_object_get_int_member(o, "file_index") : fg_dl.file_current;
-        fg_dl.pct = 0;
-        g_snprintf(fg_dl.msg, sizeof fg_dl.msg, "%s…", !g_strcmp0(ev, "resolving_link") ? "Résolution du lien" : "Téléchargement");
+        fg_dl.pct = 0; fg_dl.file_bytes = 0; fg_dl.file_size = 0; fg_dl.conns = 0; fg_dl.speed_bps = 0;
+        g_strlcpy(fg_dl.msg, "Connexion…", sizeof fg_dl.msg);
     } else if (!g_strcmp0(ev, "progress")) {
+        fg_dl.resolving = FALSE;
+        fg_dl.file_bytes = json_object_has_member(o, "file_done") ? json_object_get_int_member(o, "file_done") : fg_dl.file_bytes;
+        fg_dl.file_size = json_object_has_member(o, "file_total") ? json_object_get_int_member(o, "file_total") : fg_dl.file_size;
+        fg_dl.conns = json_object_has_member(o, "conns") ? (int)json_object_get_int_member(o, "conns") : fg_dl.conns;
         fg_dl.pct = json_object_has_member(o, "pct") ? json_object_get_double_member(o, "pct") : fg_dl.pct;
         fg_dl.speed_bps = json_object_has_member(o, "speed_bps") ? json_object_get_double_member(o, "speed_bps") : 0;
         fg_dl.game_done = json_object_has_member(o, "game_done") ? json_object_get_int_member(o, "game_done") : fg_dl.game_done;
         fg_dl.game_total = json_object_has_member(o, "game_total") ? json_object_get_int_member(o, "game_total") : fg_dl.game_total;
         g_strlcpy(fg_dl.file_name, jstr(o, "file"), sizeof fg_dl.file_name);
-        double sp = fg_dl.speed_bps;
-        if (sp > 1024*1024) g_snprintf(fg_dl.msg, sizeof fg_dl.msg, "%.1f Mo/s — %s", sp/1024/1024, fg_dl.file_name);
-        else g_snprintf(fg_dl.msg, sizeof fg_dl.msg, "%.0f Ko/s — %s", sp/1024, fg_dl.file_name);
+        g_strlcpy(fg_dl.msg, "Téléchargement", sizeof fg_dl.msg);
     } else if (!g_strcmp0(ev, "file_done") || !g_strcmp0(ev, "file_cached")) {
         fg_dl.file_done++;
-        fg_dl.pct = 100;
+        fg_dl.pct = 100; fg_dl.resolving = FALSE; fg_dl.conns = 0;
     } else if (!g_strcmp0(ev, "job_completed")) {
         fg_dl.active = FALSE; fg_dl.completed = TRUE;
         g_snprintf(fg_dl.msg, sizeof fg_dl.msg, "Téléchargement terminé : %s", fg_dl.game);

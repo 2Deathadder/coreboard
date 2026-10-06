@@ -123,6 +123,9 @@ typedef struct {
     char dest[256];                  /* dossier de destination */
     double pct;                      /* progression de la partie courante (0-100) */
     double speed_bps;                /* débit en octets/s */
+    gint64 file_bytes, file_size;    /* octets de la partie en cours */
+    int conns;                       /* connexions actives (téléchargement segmenté) */
+    gboolean resolving;              /* lien direct de la partie en cours de résolution */
     gint64 game_done, game_total;    /* octets jeu entier */
     gboolean active;                 /* téléchargement en cours */
     gboolean completed;              /* jeu complet téléchargé */
@@ -139,7 +142,11 @@ const char *fx_fg_query(void);                  /* requête courante */
 /* Résout une URL (page jeu ou paste ou ff directe) → liste de fichiers */
 void     fx_fg_resolve(const char *url);        /* lance en tâche de fond */
 gboolean fx_fg_resolved(void);                  /* TRUE une fois la résolution terminée */
+gboolean fx_fg_resolve_busy(void);              /* TRUE pendant la résolution */
+const char *fx_fg_resolve_error(void);          /* message d'erreur de la dernière résolution ("" si aucune) */
 int      fx_fg_file_count(void);
+int      fx_fg_optional_count(void);            /* fichiers optionnels (voix, bonus) non téléchargés */
+const char *fx_fg_page_url(void);               /* page du jeu sélectionné */
 const char *fx_fg_game_title(void);
 
 /* Téléchargement FitGirl */

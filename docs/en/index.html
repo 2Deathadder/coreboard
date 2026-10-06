@@ -1,33 +1,34 @@
 <!doctype html>
-<html lang="fr">
+<html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Coreboard — Centre de contrôle matériel pour Linux, alternative à Armoury Crate</title>
-<meta name="description" content="Coreboard est un centre de contrôle matériel natif et gratuit pour Linux : modes de performance, CPU, GPU, écran, éclairage RGB, scénarios par application, macros et jeux Windows via Proton. Open source (GPL-3.0).">
-<meta name="keywords" content="Coreboard, Linux, centre de contrôle, Armoury Crate Linux, alternative Armoury Crate, MSI Center Linux, RGB Linux, Proton-GE, jeux Linux, GTK4, Hyprland, GNOME, KDE">
+<title>Coreboard — Hardware control center for Linux, an Armoury Crate alternative</title>
+<meta name="description" content="Coreboard is a free, native hardware control center for Linux: performance modes, CPU, GPU, display, RGB lighting, per-app scenarios, macros and Windows games through Proton. Open source (GPL-3.0).">
+<meta name="keywords" content="Coreboard, Linux, control center, Armoury Crate Linux, Armoury Crate alternative, MSI Center Linux, RGB Linux, Proton-GE, Linux gaming, GTK4, Hyprland, GNOME, KDE">
 <meta name="author" content="windark">
 <meta name="robots" content="index, follow, max-image-preview:large">
-<link rel="canonical" href="https://2deathadder.github.io/coreboard/">
+<link rel="canonical" href="https://2deathadder.github.io/coreboard/en/">
 <link rel="alternate" hreflang="fr" href="https://2deathadder.github.io/coreboard/">
 <link rel="alternate" hreflang="en" href="https://2deathadder.github.io/coreboard/en/">
 <link rel="alternate" hreflang="x-default" href="https://2deathadder.github.io/coreboard/">
-<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="icon" href="../favicon.svg" type="image/svg+xml">
 <meta name="theme-color" content="#070506">
 
 <meta property="og:type" content="website">
-<meta property="og:locale" content="fr_FR">
+<meta property="og:locale" content="en_US">
+<meta property="og:locale:alternate" content="fr_FR">
 <meta property="og:site_name" content="Coreboard">
-<meta property="og:title" content="Coreboard — Le centre de contrôle matériel natif pour Linux">
-<meta property="og:description" content="Modes de performance, CPU/GPU, écran, RGB, scénarios, macros et jeux Windows via Proton, dans une seule application native et open source.">
-<meta property="og:url" content="https://2deathadder.github.io/coreboard/">
+<meta property="og:title" content="Coreboard — The native hardware control center for Linux">
+<meta property="og:description" content="Performance modes, CPU/GPU, display, RGB, scenarios, macros and Windows games through Proton, in one native open-source app.">
+<meta property="og:url" content="https://2deathadder.github.io/coreboard/en/">
 <meta property="og:image" content="https://2deathadder.github.io/coreboard/img/og-image.jpg">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
-<meta property="og:image:alt" content="Écran d'accueil de Coreboard : GPU, CPU, ventilateurs, mémoire et modes de fonctionnement">
+<meta property="og:image:alt" content="Coreboard home screen: GPU, CPU, fans, memory and performance modes">
 <meta name="twitter:card" content="summary_large_image">
-<meta name="twitter:title" content="Coreboard — Le centre de contrôle matériel natif pour Linux">
-<meta name="twitter:description" content="Une seule application native et open source pour piloter tout ton PC sous Linux.">
+<meta name="twitter:title" content="Coreboard — The native hardware control center for Linux">
+<meta name="twitter:description" content="One native, open-source app to control your whole PC on Linux.">
 <meta name="twitter:image" content="https://2deathadder.github.io/coreboard/img/og-image.jpg">
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -41,19 +42,19 @@
   "@context": "https://schema.org",
   "@type": "SoftwareApplication",
   "name": "Coreboard",
-  "description": "Centre de contrôle matériel natif pour Linux (GTK4) : modes de performance, CPU, GPU, écran, éclairage RGB, scénarios par application, macros et jeux Windows via Proton-GE.",
+  "description": "Native hardware control center for Linux (GTK4): performance modes, CPU, GPU, display, RGB lighting, per-app scenarios, macros and Windows games through Proton-GE.",
   "applicationCategory": "UtilitiesApplication",
   "applicationSubCategory": "System utility",
   "operatingSystem": "Linux",
   "softwareVersion": "1.0.5",
   "license": "https://www.gnu.org/licenses/gpl-3.0.html",
-  "url": "https://2deathadder.github.io/coreboard/",
+  "url": "https://2deathadder.github.io/coreboard/en/",
   "downloadUrl": "https://github.com/2Deathadder/coreboard/releases/latest",
   "codeRepository": "https://github.com/2Deathadder/coreboard",
   "screenshot": "https://2deathadder.github.io/coreboard/img/og-image.jpg",
-  "inLanguage": "fr",
+  "inLanguage": "en",
   "isAccessibleForFree": true,
-  "offers": { "@type": "Offer", "price": "0", "priceCurrency": "EUR" },
+  "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
   "author": { "@type": "Person", "name": "windark", "url": "https://github.com/2Deathadder" }
 }
 </script>
@@ -62,16 +63,16 @@
   "@context": "https://schema.org",
   "@type": "FAQPage",
   "mainEntity": [
-    {"@type": "Question", "name": "Coreboard est-il une alternative à Armoury Crate ou MSI Center sous Linux ?",
-     "acceptedAnswer": {"@type": "Answer", "text": "Oui. Coreboard regroupe dans une seule application native ce que proposent Armoury Crate ou MSI Center sous Windows : modes de performance, réglages du processeur et du GPU, écran, éclairage RGB, scénarios par application et gestion des jeux. Il n'est affilié ni à ASUS ni à MSI."}},
-    {"@type": "Question", "name": "Sur quelles distributions Linux Coreboard fonctionne-t-il ?",
-     "acceptedAnswer": {"@type": "Answer", "text": "Arch Linux et ses dérivées (Omarchy, CachyOS, EndeavourOS, Manjaro), Debian 13 et Ubuntu 24.04 ou plus récents, Fedora 38 ou plus récent et openSUSE Tumbleweed. Il faut GTK 4.10 ou plus récent."}},
-    {"@type": "Question", "name": "Quels bureaux sont pris en charge ?",
-     "acceptedAnswer": {"@type": "Answer", "text": "Hyprland, Sway, KDE Plasma, GNOME et les bureaux X11. Les fonctions s'adaptent : fréquence d'écran via le bureau, filtre lumière bleue natif sous GNOME et KDE, détection des jeux XWayland."}},
-    {"@type": "Question", "name": "Mon PC doit-il être un MSI ou un ASUS ?",
-     "acceptedAnswer": {"@type": "Answer", "text": "Non. Coreboard détecte ce que ton PC expose réellement (processeur Intel, AMD ou ARM, GPU NVIDIA, AMD ou Intel, écran, batterie) et masque ce qui n'existe pas. Seuls l'éclairage du clavier et le refroidissement adaptatif sont propres à certains portables MSI."}},
-    {"@type": "Question", "name": "Coreboard est-il gratuit ?",
-     "acceptedAnswer": {"@type": "Answer", "text": "Oui, Coreboard est un logiciel libre et gratuit sous licence GPL-3.0. Le code source est sur GitHub."}}
+    {"@type": "Question", "name": "Is Coreboard an Armoury Crate or MSI Center alternative for Linux?",
+     "acceptedAnswer": {"@type": "Answer", "text": "Yes. Coreboard brings together in one native app what Armoury Crate or MSI Center offer on Windows: performance modes, CPU and GPU tuning, display, RGB lighting, per-app scenarios and game management. It is affiliated with neither ASUS nor MSI."}},
+    {"@type": "Question", "name": "Which Linux distributions does Coreboard run on?",
+     "acceptedAnswer": {"@type": "Answer", "text": "Arch Linux and its derivatives (Omarchy, CachyOS, EndeavourOS, Manjaro), Debian 13 and Ubuntu 24.04 or newer, Fedora 38 or newer and openSUSE Tumbleweed. GTK 4.10 or newer is required."}},
+    {"@type": "Question", "name": "Which desktops are supported?",
+     "acceptedAnswer": {"@type": "Answer", "text": "Hyprland, Sway, KDE Plasma, GNOME and X11 desktops. Features adapt: refresh rate through the desktop, native night light on GNOME and KDE, detection of XWayland games."}},
+    {"@type": "Question", "name": "Does my PC have to be an MSI or an ASUS?",
+     "acceptedAnswer": {"@type": "Answer", "text": "No. Coreboard detects what your PC actually exposes (Intel, AMD or ARM CPU, NVIDIA, AMD or Intel GPU, display, battery) and hides what isn't there. Only keyboard lighting and adaptive cooling are specific to some MSI laptops."}},
+    {"@type": "Question", "name": "Is Coreboard free?",
+     "acceptedAnswer": {"@type": "Answer", "text": "Yes, Coreboard is free and open-source software under the GPL-3.0 license. The source code is on GitHub."}}
   ]
 }
 </script>
@@ -237,20 +238,20 @@ footer nav { display: flex; gap: 20px; flex-wrap: wrap; }
 
 <header class="nav">
   <div class="wrap">
-    <a class="brand" href="#accueil" aria-label="Coreboard, retour en haut"><img src="favicon.svg" alt="" width="26" height="26">Coreboard</a>
-    <nav class="nav-links" aria-label="Navigation principale">
-      <a href="#fonctionnalites">Fonctionnalités</a>
-      <a href="#captures">Captures</a>
+    <a class="brand" href="#accueil" aria-label="Coreboard, back to top"><img src="../favicon.svg" alt="" width="26" height="26">Coreboard</a>
+    <nav class="nav-links" aria-label="Main navigation">
+      <a href="#fonctionnalites">Features</a>
+      <a href="#captures">Screenshots</a>
       <a href="#fitgirl">FitGirl</a>
-      <a href="#compatibilite">Compatibilité</a>
+      <a href="#compatibilite">Compatibility</a>
       <a href="#faq">FAQ</a>
     </nav>
     <div class="nav-right">
-      <a class="lang" href="en/" hreflang="en" lang="en">EN</a>
-      <a class="icon-link" href="https://github.com/2Deathadder/coreboard" aria-label="Code source sur GitHub" rel="noopener">
+      <a class="lang" href="../" hreflang="fr" lang="fr">FR</a>
+      <a class="icon-link" href="https://github.com/2Deathadder/coreboard" aria-label="Source code on GitHub" rel="noopener">
         <svg width="20" height="20" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
       </a>
-      <a class="btn btn-primary btn-sm" href="#installation">Installer</a>
+      <a class="btn btn-primary btn-sm" href="#installation">Install</a>
     </div>
   </div>
 </header>
@@ -259,92 +260,92 @@ footer nav { display: flex; gap: 20px; flex-wrap: wrap; }
 <section class="hero" id="accueil">
   <canvas id="pixels" aria-hidden="true"></canvas>
   <div class="hero-content">
-    <a class="pill" href="https://github.com/2Deathadder/coreboard/releases/latest"><b>v1.0.5</b> Jeux FitGirl installés automatiquement, sans aucune fenêtre <span aria-hidden="true">→</span></a>
+    <a class="pill" href="https://github.com/2Deathadder/coreboard/releases/latest"><b>v1.0.5</b> FitGirl games installed automatically, with no windows at all <span aria-hidden="true">→</span></a>
     <svg class="wordmark" viewBox="0 0 620 80" role="img" aria-label="Coreboard" xmlns="http://www.w3.org/2000/svg"><rect x="10" y="0" width="9" height="9" fill="#ffe3e8"/><rect x="20" y="0" width="9" height="9" fill="#ffe3e8"/><rect x="30" y="0" width="9" height="9" fill="#ffe3e8"/><rect x="40" y="0" width="9" height="9" fill="#ffe3e8"/><rect x="0" y="10" width="9" height="9" fill="#ffb8c3"/><rect x="10" y="10" width="9" height="9" fill="#ffb8c3"/><rect x="20" y="10" width="9" height="9" fill="#ffb8c3"/><rect x="30" y="10" width="9" height="9" fill="#ffb8c3"/><rect x="40" y="10" width="9" height="9" fill="#ffb8c3"/><rect x="50" y="10" width="9" height="9" fill="#ffb8c3"/><rect x="0" y="20" width="9" height="9" fill="#ff7088"/><rect x="10" y="20" width="9" height="9" fill="#ff7088"/><rect x="0" y="30" width="9" height="9" fill="#ff1a3a"/><rect x="10" y="30" width="9" height="9" fill="#ff1a3a"/><rect x="0" y="40" width="9" height="9" fill="#e0102e"/><rect x="10" y="40" width="9" height="9" fill="#e0102e"/><rect x="0" y="50" width="9" height="9" fill="#a80b22"/><rect x="10" y="50" width="9" height="9" fill="#a80b22"/><rect x="0" y="60" width="9" height="9" fill="#6b0816"/><rect x="10" y="60" width="9" height="9" fill="#6b0816"/><rect x="20" y="60" width="9" height="9" fill="#6b0816"/><rect x="30" y="60" width="9" height="9" fill="#6b0816"/><rect x="40" y="60" width="9" height="9" fill="#6b0816"/><rect x="50" y="60" width="9" height="9" fill="#6b0816"/><rect x="10" y="70" width="9" height="9" fill="#3a050c"/><rect x="20" y="70" width="9" height="9" fill="#3a050c"/><rect x="30" y="70" width="9" height="9" fill="#3a050c"/><rect x="40" y="70" width="9" height="9" fill="#3a050c"/><rect x="80" y="0" width="9" height="9" fill="#ffe3e8"/><rect x="90" y="0" width="9" height="9" fill="#ffe3e8"/><rect x="100" y="0" width="9" height="9" fill="#ffe3e8"/><rect x="110" y="0" width="9" height="9" fill="#ffe3e8"/><rect x="70" y="10" width="9" height="9" fill="#ffb8c3"/><rect x="80" y="10" width="9" height="9" fill="#ffb8c3"/><rect x="90" y="10" width="9" height="9" fill="#ffb8c3"/><rect x="100" y="10" width="9" height="9" fill="#ffb8c3"/><rect x="110" y="10" width="9" height="9" fill="#ffb8c3"/><rect x="120" y="10" width="9" height="9" fill="#ffb8c3"/><rect x="70" y="20" width="9" height="9" fill="#ff7088"/><rect x="80" y="20" width="9" height="9" fill="#ff7088"/><rect x="110" y="20" width="9" height="9" fill="#ff7088"/><rect x="120" y="20" width="9" height="9" fill="#ff7088"/><rect x="70" y="30" width="9" height="9" fill="#ff1a3a"/><rect x="80" y="30" width="9" height="9" fill="#ff1a3a"/><rect x="110" y="30" width="9" height="9" fill="#ff1a3a"/><rect x="120" y="30" width="9" height="9" fill="#ff1a3a"/><rect x="70" y="40" width="9" height="9" fill="#e0102e"/><rect x="80" y="40" width="9" height="9" fill="#e0102e"/><rect x="110" y="40" width="9" height="9" fill="#e0102e"/><rect x="120" y="40" width="9" height="9" fill="#e0102e"/><rect x="70" y="50" width="9" height="9" fill="#a80b22"/><rect x="80" y="50" width="9" height="9" fill="#a80b22"/><rect x="110" y="50" width="9" height="9" fill="#a80b22"/><rect x="120" y="50" width="9" height="9" fill="#a80b22"/><rect x="70" y="60" width="9" height="9" fill="#6b0816"/><rect x="80" y="60" width="9" height="9" fill="#6b0816"/><rect x="90" y="60" width="9" height="9" fill="#6b0816"/><rect x="100" y="60" width="9" height="9" fill="#6b0816"/><rect x="110" y="60" width="9" height="9" fill="#6b0816"/><rect x="120" y="60" width="9" height="9" fill="#6b0816"/><rect x="80" y="70" width="9" height="9" fill="#3a050c"/><rect x="90" y="70" width="9" height="9" fill="#3a050c"/><rect x="100" y="70" width="9" height="9" fill="#3a050c"/><rect x="110" y="70" width="9" height="9" fill="#3a050c"/><rect x="140" y="0" width="9" height="9" fill="#ffe3e8"/><rect x="150" y="0" width="9" height="9" fill="#ffe3e8"/><rect x="160" y="0" width="9" height="9" fill="#ffe3e8"/><rect x="170" y="0" width="9" height="9" fill="#ffe3e8"/><rect x="180" y="0" width="9" height="9" fill="#ffe3e8"/><rect x="140" y="10" width="9" height="9" fill="#ffb8c3"/><rect x="150" y="10" width="9" height="9" fill="#ffb8c3"/><rect x="160" y="10" width="9" height="9" fill="#ffb8c3"/><rect x="170" y="10" width="9" height="9" fill="#ffb8c3"/><rect x="180" y="10" width="9" height="9" fill="#ffb8c3"/><rect x="190" y="10" width="9" height="9" fill="#ffb8c3"/><rect x="140" y="20" width="9" height="9" fill="#ff7088"/><rect x="150" y="20" width="9" height="9" fill="#ff7088"/><rect x="180" y="20" width="9" height="9" fill="#ff7088"/><rect x="190" y="20" width="9" height="9" fill="#ff7088"/><rect x="140" y="30" width="9" height="9" fill="#ff1a3a"/><rect x="150" y="30" width="9" height="9" fill="#ff1a3a"/><rect x="160" y="30" width="9" height="9" fill="#ff1a3a"/><rect x="170" y="30" width="9" height="9" fill="#ff1a3a"/><rect x="180" y="30" width="9" height="9" fill="#ff1a3a"/><rect x="190" y="30" width="9" height="9" fill="#ff1a3a"/><rect x="140" y="40" width="9" height="9" fill="#e0102e"/><rect x="150" y="40" width="9" height="9" fill="#e0102e"/><rect x="160" y="40" width="9" height="9" fill="#e0102e"/><rect x="170" y="40" width="9" height="9" fill="#e0102e"/><rect x="180" y="40" width="9" height="9" fill="#e0102e"/><rect x="140" y="50" width="9" height="9" fill="#a80b22"/><rect x="150" y="50" width="9" height="9" fill="#a80b22"/><rect x="170" y="50" width="9" height="9" fill="#a80b22"/><rect x="180" y="50" width="9" height="9" fill="#a80b22"/><rect x="140" y="60" width="9" height="9" fill="#6b0816"/><rect x="150" y="60" width="9" height="9" fill="#6b0816"/><rect x="180" y="60" width="9" height="9" fill="#6b0816"/><rect x="190" y="60" width="9" height="9" fill="#6b0816"/><rect x="140" y="70" width="9" height="9" fill="#3a050c"/><rect x="150" y="70" width="9" height="9" fill="#3a050c"/><rect x="180" y="70" width="9" height="9" fill="#3a050c"/><rect x="190" y="70" width="9" height="9" fill="#3a050c"/><rect x="210" y="0" width="9" height="9" fill="#ffe3e8"/><rect x="220" y="0" width="9" height="9" fill="#ffe3e8"/><rect x="230" y="0" width="9" height="9" fill="#ffe3e8"/><rect x="240" y="0" width="9" height="9" fill="#ffe3e8"/><rect x="250" y="0" width="9" height="9" fill="#ffe3e8"/><rect x="260" y="0" width="9" height="9" fill="#ffe3e8"/><rect x="210" y="10" width="9" height="9" fill="#ffb8c3"/><rect x="220" y="10" width="9" height="9" fill="#ffb8c3"/><rect x="230" y="10" width="9" height="9" fill="#ffb8c3"/><rect x="240" y="10" width="9" height="9" fill="#ffb8c3"/><rect x="250" y="10" width="9" height="9" fill="#ffb8c3"/><rect x="260" y="10" width="9" height="9" fill="#ffb8c3"/><rect x="210" y="20" width="9" height="9" fill="#ff7088"/><rect x="220" y="20" width="9" height="9" fill="#ff7088"/><rect x="210" y="30" width="9" height="9" fill="#ff1a3a"/><rect x="220" y="30" width="9" height="9" fill="#ff1a3a"/><rect x="230" y="30" width="9" height="9" fill="#ff1a3a"/><rect x="240" y="30" width="9" height="9" fill="#ff1a3a"/><rect x="250" y="30" width="9" height="9" fill="#ff1a3a"/><rect x="210" y="40" width="9" height="9" fill="#e0102e"/><rect x="220" y="40" width="9" height="9" fill="#e0102e"/><rect x="230" y="40" width="9" height="9" fill="#e0102e"/><rect x="240" y="40" width="9" height="9" fill="#e0102e"/><rect x="250" y="40" width="9" height="9" fill="#e0102e"/><rect x="210" y="50" width="9" height="9" fill="#a80b22"/><rect x="220" y="50" width="9" height="9" fill="#a80b22"/><rect x="210" y="60" width="9" height="9" fill="#6b0816"/><rect x="220" y="60" width="9" height="9" fill="#6b0816"/><rect x="230" y="60" width="9" height="9" fill="#6b0816"/><rect x="240" y="60" width="9" height="9" fill="#6b0816"/><rect x="250" y="60" width="9" height="9" fill="#6b0816"/><rect x="260" y="60" width="9" height="9" fill="#6b0816"/><rect x="210" y="70" width="9" height="9" fill="#3a050c"/><rect x="220" y="70" width="9" height="9" fill="#3a050c"/><rect x="230" y="70" width="9" height="9" fill="#3a050c"/><rect x="240" y="70" width="9" height="9" fill="#3a050c"/><rect x="250" y="70" width="9" height="9" fill="#3a050c"/><rect x="260" y="70" width="9" height="9" fill="#3a050c"/><rect x="280" y="0" width="9" height="9" fill="#ffe3e8"/><rect x="290" y="0" width="9" height="9" fill="#ffe3e8"/><rect x="300" y="0" width="9" height="9" fill="#ffe3e8"/><rect x="310" y="0" width="9" height="9" fill="#ffe3e8"/><rect x="320" y="0" width="9" height="9" fill="#ffe3e8"/><rect x="280" y="10" width="9" height="9" fill="#ffb8c3"/><rect x="290" y="10" width="9" height="9" fill="#ffb8c3"/><rect x="300" y="10" width="9" height="9" fill="#ffb8c3"/><rect x="310" y="10" width="9" height="9" fill="#ffb8c3"/><rect x="320" y="10" width="9" height="9" fill="#ffb8c3"/><rect x="330" y="10" width="9" height="9" fill="#ffb8c3"/><rect x="280" y="20" width="9" height="9" fill="#ff7088"/><rect x="290" y="20" width="9" height="9" fill="#ff7088"/><rect x="320" y="20" width="9" height="9" fill="#ff7088"/><rect x="330" y="20" width="9" height="9" fill="#ff7088"/><rect x="280" y="30" width="9" height="9" fill="#ff1a3a"/><rect x="290" y="30" width="9" height="9" fill="#ff1a3a"/><rect x="300" y="30" width="9" height="9" fill="#ff1a3a"/><rect x="310" y="30" width="9" height="9" fill="#ff1a3a"/><rect x="320" y="30" width="9" height="9" fill="#ff1a3a"/><rect x="280" y="40" width="9" height="9" fill="#e0102e"/><rect x="290" y="40" width="9" height="9" fill="#e0102e"/><rect x="300" y="40" width="9" height="9" fill="#e0102e"/><rect x="310" y="40" width="9" height="9" fill="#e0102e"/><rect x="320" y="40" width="9" height="9" fill="#e0102e"/><rect x="330" y="40" width="9" height="9" fill="#e0102e"/><rect x="280" y="50" width="9" height="9" fill="#a80b22"/><rect x="290" y="50" width="9" height="9" fill="#a80b22"/><rect x="320" y="50" width="9" height="9" fill="#a80b22"/><rect x="330" y="50" width="9" height="9" fill="#a80b22"/><rect x="280" y="60" width="9" height="9" fill="#6b0816"/><rect x="290" y="60" width="9" height="9" fill="#6b0816"/><rect x="300" y="60" width="9" height="9" fill="#6b0816"/><rect x="310" y="60" width="9" height="9" fill="#6b0816"/><rect x="320" y="60" width="9" height="9" fill="#6b0816"/><rect x="330" y="60" width="9" height="9" fill="#6b0816"/><rect x="280" y="70" width="9" height="9" fill="#3a050c"/><rect x="290" y="70" width="9" height="9" fill="#3a050c"/><rect x="300" y="70" width="9" height="9" fill="#3a050c"/><rect x="310" y="70" width="9" height="9" fill="#3a050c"/><rect x="320" y="70" width="9" height="9" fill="#3a050c"/><rect x="360" y="0" width="9" height="9" fill="#ffe3e8"/><rect x="370" y="0" width="9" height="9" fill="#ffe3e8"/><rect x="380" y="0" width="9" height="9" fill="#ffe3e8"/><rect x="390" y="0" width="9" height="9" fill="#ffe3e8"/><rect x="350" y="10" width="9" height="9" fill="#ffb8c3"/><rect x="360" y="10" width="9" height="9" fill="#ffb8c3"/><rect x="370" y="10" width="9" height="9" fill="#ffb8c3"/><rect x="380" y="10" width="9" height="9" fill="#ffb8c3"/><rect x="390" y="10" width="9" height="9" fill="#ffb8c3"/><rect x="400" y="10" width="9" height="9" fill="#ffb8c3"/><rect x="350" y="20" width="9" height="9" fill="#ff7088"/><rect x="360" y="20" width="9" height="9" fill="#ff7088"/><rect x="390" y="20" width="9" height="9" fill="#ff7088"/><rect x="400" y="20" width="9" height="9" fill="#ff7088"/><rect x="350" y="30" width="9" height="9" fill="#ff1a3a"/><rect x="360" y="30" width="9" height="9" fill="#ff1a3a"/><rect x="390" y="30" width="9" height="9" fill="#ff1a3a"/><rect x="400" y="30" width="9" height="9" fill="#ff1a3a"/><rect x="350" y="40" width="9" height="9" fill="#e0102e"/><rect x="360" y="40" width="9" height="9" fill="#e0102e"/><rect x="390" y="40" width="9" height="9" fill="#e0102e"/><rect x="400" y="40" width="9" height="9" fill="#e0102e"/><rect x="350" y="50" width="9" height="9" fill="#a80b22"/><rect x="360" y="50" width="9" height="9" fill="#a80b22"/><rect x="390" y="50" width="9" height="9" fill="#a80b22"/><rect x="400" y="50" width="9" height="9" fill="#a80b22"/><rect x="350" y="60" width="9" height="9" fill="#6b0816"/><rect x="360" y="60" width="9" height="9" fill="#6b0816"/><rect x="370" y="60" width="9" height="9" fill="#6b0816"/><rect x="380" y="60" width="9" height="9" fill="#6b0816"/><rect x="390" y="60" width="9" height="9" fill="#6b0816"/><rect x="400" y="60" width="9" height="9" fill="#6b0816"/><rect x="360" y="70" width="9" height="9" fill="#3a050c"/><rect x="370" y="70" width="9" height="9" fill="#3a050c"/><rect x="380" y="70" width="9" height="9" fill="#3a050c"/><rect x="390" y="70" width="9" height="9" fill="#3a050c"/><rect x="430" y="0" width="9" height="9" fill="#ffe3e8"/><rect x="440" y="0" width="9" height="9" fill="#ffe3e8"/><rect x="450" y="0" width="9" height="9" fill="#ffe3e8"/><rect x="460" y="0" width="9" height="9" fill="#ffe3e8"/><rect x="420" y="10" width="9" height="9" fill="#ffb8c3"/><rect x="430" y="10" width="9" height="9" fill="#ffb8c3"/><rect x="440" y="10" width="9" height="9" fill="#ffb8c3"/><rect x="450" y="10" width="9" height="9" fill="#ffb8c3"/><rect x="460" y="10" width="9" height="9" fill="#ffb8c3"/><rect x="470" y="10" width="9" height="9" fill="#ffb8c3"/><rect x="420" y="20" width="9" height="9" fill="#ff7088"/><rect x="430" y="20" width="9" height="9" fill="#ff7088"/><rect x="460" y="20" width="9" height="9" fill="#ff7088"/><rect x="470" y="20" width="9" height="9" fill="#ff7088"/><rect x="420" y="30" width="9" height="9" fill="#ff1a3a"/><rect x="430" y="30" width="9" height="9" fill="#ff1a3a"/><rect x="460" y="30" width="9" height="9" fill="#ff1a3a"/><rect x="470" y="30" width="9" height="9" fill="#ff1a3a"/><rect x="420" y="40" width="9" height="9" fill="#e0102e"/><rect x="430" y="40" width="9" height="9" fill="#e0102e"/><rect x="440" y="40" width="9" height="9" fill="#e0102e"/><rect x="450" y="40" width="9" height="9" fill="#e0102e"/><rect x="460" y="40" width="9" height="9" fill="#e0102e"/><rect x="470" y="40" width="9" height="9" fill="#e0102e"/><rect x="420" y="50" width="9" height="9" fill="#a80b22"/><rect x="430" y="50" width="9" height="9" fill="#a80b22"/><rect x="440" y="50" width="9" height="9" fill="#a80b22"/><rect x="450" y="50" width="9" height="9" fill="#a80b22"/><rect x="460" y="50" width="9" height="9" fill="#a80b22"/><rect x="470" y="50" width="9" height="9" fill="#a80b22"/><rect x="420" y="60" width="9" height="9" fill="#6b0816"/><rect x="430" y="60" width="9" height="9" fill="#6b0816"/><rect x="460" y="60" width="9" height="9" fill="#6b0816"/><rect x="470" y="60" width="9" height="9" fill="#6b0816"/><rect x="420" y="70" width="9" height="9" fill="#3a050c"/><rect x="430" y="70" width="9" height="9" fill="#3a050c"/><rect x="460" y="70" width="9" height="9" fill="#3a050c"/><rect x="470" y="70" width="9" height="9" fill="#3a050c"/><rect x="490" y="0" width="9" height="9" fill="#ffe3e8"/><rect x="500" y="0" width="9" height="9" fill="#ffe3e8"/><rect x="510" y="0" width="9" height="9" fill="#ffe3e8"/><rect x="520" y="0" width="9" height="9" fill="#ffe3e8"/><rect x="530" y="0" width="9" height="9" fill="#ffe3e8"/><rect x="490" y="10" width="9" height="9" fill="#ffb8c3"/><rect x="500" y="10" width="9" height="9" fill="#ffb8c3"/><rect x="510" y="10" width="9" height="9" fill="#ffb8c3"/><rect x="520" y="10" width="9" height="9" fill="#ffb8c3"/><rect x="530" y="10" width="9" height="9" fill="#ffb8c3"/><rect x="540" y="10" width="9" height="9" fill="#ffb8c3"/><rect x="490" y="20" width="9" height="9" fill="#ff7088"/><rect x="500" y="20" width="9" height="9" fill="#ff7088"/><rect x="530" y="20" width="9" height="9" fill="#ff7088"/><rect x="540" y="20" width="9" height="9" fill="#ff7088"/><rect x="490" y="30" width="9" height="9" fill="#ff1a3a"/><rect x="500" y="30" width="9" height="9" fill="#ff1a3a"/><rect x="510" y="30" width="9" height="9" fill="#ff1a3a"/><rect x="520" y="30" width="9" height="9" fill="#ff1a3a"/><rect x="530" y="30" width="9" height="9" fill="#ff1a3a"/><rect x="540" y="30" width="9" height="9" fill="#ff1a3a"/><rect x="490" y="40" width="9" height="9" fill="#e0102e"/><rect x="500" y="40" width="9" height="9" fill="#e0102e"/><rect x="510" y="40" width="9" height="9" fill="#e0102e"/><rect x="520" y="40" width="9" height="9" fill="#e0102e"/><rect x="530" y="40" width="9" height="9" fill="#e0102e"/><rect x="490" y="50" width="9" height="9" fill="#a80b22"/><rect x="500" y="50" width="9" height="9" fill="#a80b22"/><rect x="520" y="50" width="9" height="9" fill="#a80b22"/><rect x="530" y="50" width="9" height="9" fill="#a80b22"/><rect x="490" y="60" width="9" height="9" fill="#6b0816"/><rect x="500" y="60" width="9" height="9" fill="#6b0816"/><rect x="530" y="60" width="9" height="9" fill="#6b0816"/><rect x="540" y="60" width="9" height="9" fill="#6b0816"/><rect x="490" y="70" width="9" height="9" fill="#3a050c"/><rect x="500" y="70" width="9" height="9" fill="#3a050c"/><rect x="530" y="70" width="9" height="9" fill="#3a050c"/><rect x="540" y="70" width="9" height="9" fill="#3a050c"/><rect x="560" y="0" width="9" height="9" fill="#ffe3e8"/><rect x="570" y="0" width="9" height="9" fill="#ffe3e8"/><rect x="580" y="0" width="9" height="9" fill="#ffe3e8"/><rect x="590" y="0" width="9" height="9" fill="#ffe3e8"/><rect x="600" y="0" width="9" height="9" fill="#ffe3e8"/><rect x="560" y="10" width="9" height="9" fill="#ffb8c3"/><rect x="570" y="10" width="9" height="9" fill="#ffb8c3"/><rect x="580" y="10" width="9" height="9" fill="#ffb8c3"/><rect x="590" y="10" width="9" height="9" fill="#ffb8c3"/><rect x="600" y="10" width="9" height="9" fill="#ffb8c3"/><rect x="610" y="10" width="9" height="9" fill="#ffb8c3"/><rect x="560" y="20" width="9" height="9" fill="#ff7088"/><rect x="570" y="20" width="9" height="9" fill="#ff7088"/><rect x="600" y="20" width="9" height="9" fill="#ff7088"/><rect x="610" y="20" width="9" height="9" fill="#ff7088"/><rect x="560" y="30" width="9" height="9" fill="#ff1a3a"/><rect x="570" y="30" width="9" height="9" fill="#ff1a3a"/><rect x="600" y="30" width="9" height="9" fill="#ff1a3a"/><rect x="610" y="30" width="9" height="9" fill="#ff1a3a"/><rect x="560" y="40" width="9" height="9" fill="#e0102e"/><rect x="570" y="40" width="9" height="9" fill="#e0102e"/><rect x="600" y="40" width="9" height="9" fill="#e0102e"/><rect x="610" y="40" width="9" height="9" fill="#e0102e"/><rect x="560" y="50" width="9" height="9" fill="#a80b22"/><rect x="570" y="50" width="9" height="9" fill="#a80b22"/><rect x="600" y="50" width="9" height="9" fill="#a80b22"/><rect x="610" y="50" width="9" height="9" fill="#a80b22"/><rect x="560" y="60" width="9" height="9" fill="#6b0816"/><rect x="570" y="60" width="9" height="9" fill="#6b0816"/><rect x="580" y="60" width="9" height="9" fill="#6b0816"/><rect x="590" y="60" width="9" height="9" fill="#6b0816"/><rect x="600" y="60" width="9" height="9" fill="#6b0816"/><rect x="610" y="60" width="9" height="9" fill="#6b0816"/><rect x="560" y="70" width="9" height="9" fill="#3a050c"/><rect x="570" y="70" width="9" height="9" fill="#3a050c"/><rect x="580" y="70" width="9" height="9" fill="#3a050c"/><rect x="590" y="70" width="9" height="9" fill="#3a050c"/><rect x="600" y="70" width="9" height="9" fill="#3a050c"/></svg>
-    <h1><span class="sr-only">Coreboard : </span>Le centre de contrôle matériel natif pour Linux</h1>
-    <p class="lead">Performances, processeur, GPU, écran, éclairage RGB, scénarios et jeux&nbsp;: tout ton PC dans une seule application rapide, écrite en C et GTK4.</p>
+    <h1><span class="sr-only">Coreboard: </span>The native hardware control center for Linux</h1>
+    <p class="lead">Performance, CPU, GPU, display, RGB lighting, scenarios and games: your whole PC in one fast app, written in C and GTK4.</p>
     <div class="cta">
       <a class="btn btn-primary" href="#installation">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 3v12m0 0l-5-5m5 5l5-5M4 21h16"/></svg>
-        Installer Coreboard
+        Install Coreboard
       </a>
       <a class="btn btn-ghost" href="#captures">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M6 4l14 8-14 8z"/></svg>
-        Voir l'interface
+        See the interface
       </a>
     </div>
-    <p class="hero-meta">Gratuit · Open source (GPL-3.0) · Arch, Debian, Ubuntu, Fedora, openSUSE</p>
+    <p class="hero-meta">Free · Open source (GPL-3.0) · Arch, Debian, Ubuntu, Fedora, openSUSE</p>
   </div>
 </section>
 
 <section class="block" id="apropos">
   <div class="wrap split">
     <div>
-      <span class="eyebrow">Pourquoi Coreboard</span>
-      <h2>L'équivalent d'Armoury Crate, pensé pour Linux</h2>
-      <p class="section-lead">Sous Windows, les constructeurs fournissent un panneau pour tout régler. Sous Linux, il fallait jongler entre dix outils en ligne de commande. Coreboard les réunit dans une interface sombre et soignée.</p>
+      <span class="eyebrow">Why Coreboard</span>
+      <h2>The Armoury Crate equivalent, built for Linux</h2>
+      <p class="section-lead">On Windows, manufacturers ship one panel to tune everything. On Linux, you had to juggle a dozen command-line tools. Coreboard brings them together in a polished dark interface.</p>
       <ul class="points">
-        <li><b>Natif et léger</b> : écrit en C avec GTK4, démarre instantanément, aucun moteur web embarqué.</li>
-        <li><b>Il s'adapte à ton PC</b> : il détecte ce que ton matériel expose vraiment et masque le reste.</li>
-        <li><b>Sans compte ni télémétrie</b> : tout reste sur ta machine.</li>
+        <li><b>Native and lightweight</b>: written in C with GTK4, starts instantly, no embedded web engine.</li>
+        <li><b>It adapts to your PC</b>: it detects what your hardware really exposes and hides the rest.</li>
+        <li><b>No account, no telemetry</b>: everything stays on your machine.</li>
       </ul>
     </div>
     <div class="shot">
-      <img src="img/accueil.webp" width="1280" height="700" alt="Accueil de Coreboard : photo de l'appareil, utilisation du GPU et du CPU, ventilateurs, mémoire et modes de fonctionnement Silencieux, Équilibré, Turbo" fetchpriority="high">
+      <img src="../img/accueil.webp" width="1280" height="700" alt="Coreboard home: device picture, GPU and CPU usage, fans, memory and Silent, Balanced, Turbo performance modes" fetchpriority="high">
     </div>
   </div>
 </section>
 
 <section class="block deep" id="fonctionnalites">
   <div class="wrap">
-    <span class="eyebrow">Fonctionnalités</span>
-    <h2>Tout ton matériel, au même endroit</h2>
-    <p class="section-lead">Chaque réglage passe par les interfaces standard de Linux&nbsp;: power-profiles-daemon, sysfs, D-Bus, polkit.</p>
+    <span class="eyebrow">Features</span>
+    <h2>All your hardware, in one place</h2>
+    <p class="section-lead">Every setting goes through standard Linux interfaces: power-profiles-daemon, sysfs, D-Bus, polkit.</p>
     <div class="grid">
       <article class="card">
         <div class="ico"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 14l4-4M3.34 19a10 10 0 1117.32 0"/></svg></div>
-        <h3>Modes de fonctionnement</h3>
-        <p>Silencieux, Équilibré, Turbo&nbsp;: un clic bascule le profil d'alimentation du système.</p>
+        <h3>Performance modes</h3>
+        <p>Silent, Balanced, Turbo: one click switches the system power profile.</p>
       </article>
       <article class="card">
         <div class="ico"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="5" y="5" width="14" height="14" rx="2"/><path d="M9 9h6v6H9zM9 1v4M15 1v4M9 19v4M15 19v4M1 9h4M1 15h4M19 9h4M19 15h4"/></svg></div>
-        <h3>Processeur et GPU</h3>
-        <p>Turbo Boost, préférence énergétique, gouverneur, températures, fréquences et mode GPU hybride.</p>
+        <h3>CPU and GPU</h3>
+        <p>Turbo Boost, energy preference, governor, temperatures, frequencies and hybrid GPU mode.</p>
       </article>
       <article class="card">
         <div class="ico"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg></div>
-        <h3>Écran</h3>
-        <p>Fréquence de rafraîchissement, luminosité et filtre lumière bleue, sous Hyprland, Sway, KDE, GNOME ou X11.</p>
+        <h3>Display</h3>
+        <p>Refresh rate, brightness and night light, on Hyprland, Sway, KDE, GNOME or X11.</p>
       </article>
       <article class="card">
         <div class="ico"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="2" y="6" width="20" height="12" rx="2"/><path d="M6 10h.01M10 10h.01M14 10h.01M18 10h.01M7 14h10"/></svg></div>
-        <h3>Éclairage RGB</h3>
-        <p>Effets par zone, couleurs personnalisées et mode Musique qui fait réagir le clavier au son.</p>
+        <h3>RGB lighting</h3>
+        <p>Per-zone effects, custom colors and a Music mode that makes the keyboard react to sound.</p>
       </article>
       <article class="card">
         <div class="ico"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 2l9 5-9 5-9-5 9-5zM3 12l9 5 9-5M3 17l9 5 9-5"/></svg></div>
-        <h3>Scénarios</h3>
-        <p>Quand un jeu prend le focus, Coreboard applique le mode et la fréquence voulus, puis restaure les réglages.</p>
+        <h3>Scenarios</h3>
+        <p>When a game gets focus, Coreboard applies the mode and refresh rate you chose, then restores your settings.</p>
       </article>
       <article class="card">
         <div class="ico"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M10 8l6 4-6 4z"/></svg></div>
         <h3>Macros</h3>
-        <p>Enregistre des séquences de touches, rejoue-les avec répétitions et assigne-leur un raccourci global.</p>
+        <p>Record key sequences, replay them with repeats and bind them to a global shortcut.</p>
       </article>
       <article class="card">
         <div class="ico"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M6 11h4M8 9v4M15 12h.01M18 10h.01M17.32 5H6.68a4 4 0 00-3.98 3.59L2 15a3 3 0 005.12 2.12L9 15h6l1.88 2.12A3 3 0 0022 15l-.7-6.41A4 4 0 0017.32 5z"/></svg></div>
-        <h3>Bibliothèque de jeux</h3>
-        <p>Steam, Epic (Legendary), GOG, Lutris et applications de jeu, réunis et lançables d'un clic.</p>
+        <h3>Game library</h3>
+        <p>Steam, Epic (Legendary), GOG, Lutris and game apps, gathered and launched in one click.</p>
       </article>
       <article class="card">
         <div class="ico"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M3 5l8-1.5v8H3zM13 3.2L21 2v9.5h-8zM3 13h8v8L3 19.5zM13 13h8v9l-8-1.3z"/></svg></div>
-        <h3>Jeux Windows</h3>
-        <p>Proton-GE et umu-launcher, DLSS, ray tracing, GameMode, MangoHud et un diagnostic qui optimise le système.</p>
+        <h3>Windows games</h3>
+        <p>Proton-GE and umu-launcher, DLSS, ray tracing, GameMode, MangoHud and a check-up that tunes your system.</p>
       </article>
       <article class="card">
         <div class="ico"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 3v12m0 0l-5-5m5 5l5-5M4 21h16"/></svg></div>
         <h3>FitGirl Repacks</h3>
-        <p>Recherche, téléchargement segmenté reprenable, extraction et installation dans Wine. <a href="#fitgirl">En savoir plus</a></p>
+        <p>Search, resumable multi-connection download, extraction and installation in Wine. <a href="#fitgirl">Learn more</a></p>
       </article>
     </div>
   </div>
@@ -352,19 +353,19 @@ footer nav { display: flex; gap: 20px; flex-wrap: wrap; }
 
 <section class="block" id="captures">
   <div class="wrap">
-    <span class="eyebrow">Captures</span>
-    <h2>Une interface sombre, nette et lisible</h2>
-    <p class="section-lead">Barre latérale, en-têtes rouges, cartes de mesures en direct&nbsp;: l'ergonomie des centres de contrôle gaming, sans leur lourdeur.</p>
+    <span class="eyebrow">Screenshots</span>
+    <h2>A dark, crisp and readable interface</h2>
+    <p class="section-lead">Sidebar, red headers, live metric cards: the feel of gaming control centers, without the bloat.</p>
     <div class="gallery">
-      <div class="tabs" role="tablist" aria-label="Pages de Coreboard">
-        <button class="tab" role="tab" aria-selected="true" aria-controls="cap" data-img="img/performances.webp" data-cap="Performances : profil, Turbo Boost, préférence énergétique, ventilateurs et températures.">Performances</button>
-        <button class="tab" role="tab" aria-selected="false" aria-controls="cap" data-img="img/eclairage.webp" data-cap="Éclairage : aperçu du clavier par zone, effets, couleur et luminosité.">Éclairage</button>
-        <button class="tab" role="tab" aria-selected="false" aria-controls="cap" data-img="img/ecran.webp" data-cap="Écran et GPU : mode GPU hybride, luminosité et filtre lumière bleue.">Écran &amp; GPU</button>
-        <button class="tab" role="tab" aria-selected="false" aria-controls="cap" data-img="img/jeux-windows.webp" data-cap="Jeux Windows : environnement Proton prêt et diagnostic d'optimisation du système.">Jeux Windows</button>
+      <div class="tabs" role="tablist" aria-label="Coreboard pages">
+        <button class="tab" role="tab" aria-selected="true" aria-controls="cap" data-img="../img/performances.webp" data-cap="Performance: profile, Turbo Boost, energy preference, fans and temperatures.">Performance</button>
+        <button class="tab" role="tab" aria-selected="false" aria-controls="cap" data-img="../img/eclairage.webp" data-cap="Lighting: per-zone keyboard preview, effects, color and brightness.">Lighting</button>
+        <button class="tab" role="tab" aria-selected="false" aria-controls="cap" data-img="../img/ecran.webp" data-cap="Display and GPU: hybrid GPU mode, brightness and night light.">Display &amp; GPU</button>
+        <button class="tab" role="tab" aria-selected="false" aria-controls="cap" data-img="../img/jeux-windows.webp" data-cap="Windows games: Proton environment ready and system optimization check-up.">Windows games</button>
       </div>
       <div id="cap" role="tabpanel"><figure>
-        <div class="shot"><img id="cap-img" src="img/performances.webp" width="1280" height="700" loading="lazy" alt="Page Performances de Coreboard : profil, Turbo Boost, préférence énergétique, ventilateurs et températures"></div>
-        <figcaption id="cap-txt">Performances : profil, Turbo Boost, préférence énergétique, ventilateurs et températures.</figcaption>
+        <div class="shot"><img id="cap-img" src="../img/performances.webp" width="1280" height="700" loading="lazy" alt="Coreboard Performance page: profile, Turbo Boost, energy preference, fans and temperatures"></div>
+        <figcaption id="cap-txt">Performance: profile, Turbo Boost, energy preference, fans and temperatures.</figcaption>
       </figure></div>
     </div>
   </div>
@@ -374,88 +375,88 @@ footer nav { display: flex; gap: 20px; flex-wrap: wrap; }
   <div class="wrap split">
     <div>
       <span class="eyebrow">FitGirl Repacks</span>
-      <h2>Du repack au jeu installé, sans quitter Coreboard</h2>
-      <p class="section-lead">Recherche un repack FitGirl, télécharge-le et installe-le dans Wine en quelques clics. Plus besoin de gestionnaire de téléchargement ni de manipulations dans le terminal.</p>
+      <h2>From repack to installed game, without leaving Coreboard</h2>
+      <p class="section-lead">Search for a FitGirl repack, download it and install it in Wine in a few clicks. No download manager, no terminal juggling.</p>
       <ol class="steps">
-        <li><div><b>Rechercher</b><span>Les résultats du catalogue FitGirl s'affichent directement dans l'application.</span></div></li>
-        <li><div><b>Télécharger</b><span>Huit connexions par fichier, reprise exacte après une coupure, une pause ou un redémarrage. Les fichiers optionnels (voix, bonus) sont ignorés.</span></div></li>
-        <li><div><b>Extraire et installer</b><span>7-Zip extrait les archives, puis l'installation se fait toute seule, sans aucune fenêtre, dans Wine (Proton-GE) avec un préfixe propre au jeu. La progression s'affiche dans Coreboard.</span></div></li>
-        <li><div><b>Jouer</b><span>Le jeu rejoint « Jeux Windows » avec DLSS, GameMode et MangoHud. Les archives peuvent ensuite être supprimées pour libérer l'espace.</span></div></li>
+        <li><div><b>Search</b><span>Results from the FitGirl catalog show up right inside the app.</span></div></li>
+        <li><div><b>Download</b><span>Eight connections per file, exact resume after a dropout, a pause or a reboot. Optional files (voices, bonus) are skipped.</span></div></li>
+        <li><div><b>Extract and install</b><span>7-Zip extracts the archives, then installation runs on its own, with no windows at all, in Wine (Proton-GE) with a dedicated prefix. Progress shows in Coreboard.</span></div></li>
+        <li><div><b>Play</b><span>The game joins “Windows games” with DLSS, GameMode and MangoHud. Archives can then be deleted to free up space.</span></div></li>
       </ol>
-      <p class="legal">Respecte le droit d'auteur de ton pays&nbsp;: télécharge uniquement des jeux que tu as le droit d'utiliser. Coreboard n'est pas affilié à FitGirl Repacks et n'héberge aucun fichier.</p>
+      <p class="legal">Respect copyright law in your country: only download games you have the right to use. Coreboard is not affiliated with FitGirl Repacks and hosts no files.</p>
     </div>
     <div class="shot">
-      <img src="img/fitgirl.webp" width="1280" height="700" loading="lazy" alt="Page FitGirl Repacks de Coreboard : recherche, jeu sélectionné avec le nombre de parties, bouton Télécharger et choix du dossier">
+      <img src="../img/fitgirl.webp" width="1280" height="700" loading="lazy" alt="Coreboard FitGirl Repacks page: search, selected game with its number of parts, Download button and folder choice">
     </div>
   </div>
 </section>
 
 <section class="block" id="compatibilite">
   <div class="wrap">
-    <span class="eyebrow">Compatibilité</span>
-    <h2>Toutes les distributions, tous les bureaux</h2>
-    <p class="section-lead">Coreboard choisit lui-même le bon outil selon ton système, et installe ce qui manque avec le gestionnaire de paquets de ta distribution.</p>
-    <div class="chips" aria-label="Distributions prises en charge">
+    <span class="eyebrow">Compatibility</span>
+    <h2>Every distribution, every desktop</h2>
+    <p class="section-lead">Coreboard picks the right tool for your system on its own, and installs what's missing with your distribution's package manager.</p>
+    <div class="chips" aria-label="Supported distributions">
       <span class="chip">Arch Linux</span><span class="chip">Omarchy</span><span class="chip">CachyOS</span><span class="chip">EndeavourOS</span><span class="chip">Manjaro</span>
       <span class="chip">Ubuntu 24.04+</span><span class="chip">Debian 13+</span><span class="chip">Linux Mint</span><span class="chip">Fedora 38+</span><span class="chip">openSUSE Tumbleweed</span>
     </div>
     <div class="table-wrap">
       <table>
-        <caption class="sr-only">Fonctions disponibles selon le bureau</caption>
-        <thead><tr><th scope="col">Fonction</th><th scope="col">Hyprland</th><th scope="col">Sway</th><th scope="col">KDE Plasma</th><th scope="col">GNOME</th><th scope="col">X11</th></tr></thead>
+        <caption class="sr-only">Features available per desktop</caption>
+        <thead><tr><th scope="col">Feature</th><th scope="col">Hyprland</th><th scope="col">Sway</th><th scope="col">KDE Plasma</th><th scope="col">GNOME</th><th scope="col">X11</th></tr></thead>
         <tbody>
-          <tr><th scope="row">Matériel, profils, CPU, GPU, audio</th><td class="y">Oui</td><td class="y">Oui</td><td class="y">Oui</td><td class="y">Oui</td><td class="y">Oui</td></tr>
-          <tr><th scope="row">Fréquence d'écran</th><td class="y">Oui</td><td class="y">Oui</td><td class="y">Oui</td><td class="y">Oui</td><td class="y">Oui</td></tr>
-          <tr><th scope="row">Filtre lumière bleue</th><td class="y">Oui</td><td class="y">Oui</td><td class="y">Natif</td><td class="y">Natif</td><td class="y">Oui</td></tr>
-          <tr><th scope="row">Scénarios par application</th><td class="y">Oui</td><td class="y">Oui</td><td class="y">Jeux XWayland</td><td class="y">Jeux XWayland</td><td class="y">Oui</td></tr>
-          <tr><th scope="row">Macros (rejeu)</th><td class="y">wtype</td><td class="y">wtype</td><td class="y">ydotool</td><td class="y">ydotool</td><td class="y">xdotool</td></tr>
-          <tr><th scope="row">GameVisual (filtre d'écran)</th><td class="y">Oui</td><td class="n">—</td><td class="n">—</td><td class="n">—</td><td class="n">—</td></tr>
+          <tr><th scope="row">Hardware, profiles, CPU, GPU, audio</th><td class="y">Yes</td><td class="y">Yes</td><td class="y">Yes</td><td class="y">Yes</td><td class="y">Yes</td></tr>
+          <tr><th scope="row">Refresh rate</th><td class="y">Yes</td><td class="y">Yes</td><td class="y">Yes</td><td class="y">Yes</td><td class="y">Yes</td></tr>
+          <tr><th scope="row">Night light</th><td class="y">Yes</td><td class="y">Yes</td><td class="y">Native</td><td class="y">Native</td><td class="y">Yes</td></tr>
+          <tr><th scope="row">Per-app scenarios</th><td class="y">Yes</td><td class="y">Yes</td><td class="y">XWayland games</td><td class="y">XWayland games</td><td class="y">Yes</td></tr>
+          <tr><th scope="row">Macros (playback)</th><td class="y">wtype</td><td class="y">wtype</td><td class="y">ydotool</td><td class="y">ydotool</td><td class="y">xdotool</td></tr>
+          <tr><th scope="row">GameVisual (screen filter)</th><td class="y">Yes</td><td class="n">—</td><td class="n">—</td><td class="n">—</td><td class="n">—</td></tr>
         </tbody>
       </table>
     </div>
-    <p class="note">Processeurs Intel, AMD et ARM · GPU NVIDIA, AMD et Intel · GTK 4.10 ou plus récent requis.</p>
+    <p class="note">Intel, AMD and ARM CPUs · NVIDIA, AMD and Intel GPUs · GTK 4.10 or newer required.</p>
   </div>
 </section>
 
 <section class="block deep" id="installation">
   <div class="wrap">
     <span class="eyebrow">Installation</span>
-    <h2>Installe Coreboard en deux minutes</h2>
-    <p class="section-lead">Choisis ta distribution, copie les commandes dans un terminal.</p>
+    <h2>Install Coreboard in two minutes</h2>
+    <p class="section-lead">Pick your distribution and paste the commands into a terminal.</p>
     <div class="install">
       <div class="tabs" role="tablist" aria-label="Distribution">
-        <button class="tab" role="tab" aria-selected="true" data-target="i-arch">Arch &amp; dérivées</button>
+        <button class="tab" role="tab" aria-selected="true" data-target="i-arch">Arch &amp; derivatives</button>
         <button class="tab" role="tab" aria-selected="false" data-target="i-deb">Debian / Ubuntu</button>
         <button class="tab" role="tab" aria-selected="false" data-target="i-fed">Fedora</button>
         <button class="tab" role="tab" aria-selected="false" data-target="i-suse">openSUSE</button>
       </div>
-      <div class="code" id="i-arch" role="tabpanel"><button class="btn btn-ghost btn-sm copy">Copier</button><pre><code><span class="c"># paquet natif : démon de refroidissement et règle udev inclus</span>
+      <div class="code" id="i-arch" role="tabpanel"><button class="btn btn-ghost btn-sm copy">Copy</button><pre><code><span class="c"># native package: cooling daemon and udev rule included</span>
 <span class="p">$ </span>git clone https://github.com/2Deathadder/coreboard.git
 <span class="p">$ </span>cd coreboard/packaging/arch &amp;&amp; makepkg -si</code></pre></div>
-      <div class="code" id="i-deb" role="tabpanel" hidden><button class="btn btn-ghost btn-sm copy">Copier</button><pre><code><span class="p">$ </span>sudo apt install -y git
+      <div class="code" id="i-deb" role="tabpanel" hidden><button class="btn btn-ghost btn-sm copy">Copy</button><pre><code><span class="p">$ </span>sudo apt install -y git
 <span class="p">$ </span>git clone https://github.com/2Deathadder/coreboard.git &amp;&amp; cd coreboard
 <span class="p">$ </span>make deps &amp;&amp; make &amp;&amp; make install</code></pre></div>
-      <div class="code" id="i-fed" role="tabpanel" hidden><button class="btn btn-ghost btn-sm copy">Copier</button><pre><code><span class="p">$ </span>sudo dnf install -y git
+      <div class="code" id="i-fed" role="tabpanel" hidden><button class="btn btn-ghost btn-sm copy">Copy</button><pre><code><span class="p">$ </span>sudo dnf install -y git
 <span class="p">$ </span>git clone https://github.com/2Deathadder/coreboard.git &amp;&amp; cd coreboard
 <span class="p">$ </span>make deps &amp;&amp; make &amp;&amp; make install</code></pre></div>
-      <div class="code" id="i-suse" role="tabpanel" hidden><button class="btn btn-ghost btn-sm copy">Copier</button><pre><code><span class="p">$ </span>sudo zypper install -y git
+      <div class="code" id="i-suse" role="tabpanel" hidden><button class="btn btn-ghost btn-sm copy">Copy</button><pre><code><span class="p">$ </span>sudo zypper install -y git
 <span class="p">$ </span>git clone https://github.com/2Deathadder/coreboard.git &amp;&amp; cd coreboard
 <span class="p">$ </span>make deps &amp;&amp; make &amp;&amp; make install</code></pre></div>
     </div>
-    <p class="note">Ensuite, lance <code>coreboard</code> depuis le menu des applications. Un raccourci clavier sur <code>coreboard --toggle</code> ouvre et ferme la fenêtre.</p>
+    <p class="note">Then launch <code>coreboard</code> from your app menu. A keyboard shortcut on <code>coreboard --toggle</code> opens and closes the window.</p>
   </div>
 </section>
 
 <section class="block" id="faq">
   <div class="wrap">
-    <span class="eyebrow">Questions fréquentes</span>
+    <span class="eyebrow">Frequently asked questions</span>
     <h2>FAQ</h2>
     <div class="faq">
-      <details><summary>Coreboard est-il une alternative à Armoury Crate ou MSI Center sous Linux&nbsp;?</summary><p>Oui. Coreboard regroupe dans une seule application native ce que proposent Armoury Crate ou MSI Center sous Windows&nbsp;: modes de performance, réglages du processeur et du GPU, écran, éclairage RGB, scénarios par application et gestion des jeux. Il n'est affilié ni à ASUS ni à MSI.</p></details>
-      <details><summary>Sur quelles distributions Linux Coreboard fonctionne-t-il&nbsp;?</summary><p>Arch Linux et ses dérivées (Omarchy, CachyOS, EndeavourOS, Manjaro), Debian 13 et Ubuntu 24.04 ou plus récents, Fedora 38 ou plus récent et openSUSE Tumbleweed. Il faut GTK 4.10 ou plus récent.</p></details>
-      <details><summary>Quels bureaux sont pris en charge&nbsp;?</summary><p>Hyprland, Sway, KDE Plasma, GNOME et les bureaux X11. Les fonctions s'adaptent&nbsp;: fréquence d'écran via le bureau, filtre lumière bleue natif sous GNOME et KDE, détection des jeux XWayland.</p></details>
-      <details><summary>Mon PC doit-il être un MSI ou un ASUS&nbsp;?</summary><p>Non. Coreboard détecte ce que ton PC expose réellement (processeur Intel, AMD ou ARM, GPU NVIDIA, AMD ou Intel, écran, batterie) et masque ce qui n'existe pas. Seuls l'éclairage du clavier et le refroidissement adaptatif sont propres à certains portables MSI.</p></details>
-      <details><summary>Coreboard est-il gratuit&nbsp;?</summary><p>Oui, Coreboard est un logiciel libre et gratuit sous licence GPL-3.0. Le code source est sur <a href="https://github.com/2Deathadder/coreboard">GitHub</a>.</p></details>
+      <details><summary>Is Coreboard an Armoury Crate or MSI Center alternative for Linux?</summary><p>Yes. Coreboard brings together in one native app what Armoury Crate or MSI Center offer on Windows: performance modes, CPU and GPU tuning, display, RGB lighting, per-app scenarios and game management. It is affiliated with neither ASUS nor MSI.</p></details>
+      <details><summary>Which Linux distributions does Coreboard run on?</summary><p>Arch Linux and its derivatives (Omarchy, CachyOS, EndeavourOS, Manjaro), Debian 13 and Ubuntu 24.04 or newer, Fedora 38 or newer and openSUSE Tumbleweed. GTK 4.10 or newer is required.</p></details>
+      <details><summary>Which desktops are supported?</summary><p>Hyprland, Sway, KDE Plasma, GNOME and X11 desktops. Features adapt: refresh rate through the desktop, native night light on GNOME and KDE, detection of XWayland games.</p></details>
+      <details><summary>Does my PC have to be an MSI or an ASUS?</summary><p>No. Coreboard detects what your PC actually exposes (Intel, AMD or ARM CPU, NVIDIA, AMD or Intel GPU, display, battery) and hides what isn't there. Only keyboard lighting and adaptive cooling are specific to some MSI laptops.</p></details>
+      <details><summary>Is Coreboard free?</summary><p>Yes, Coreboard is free and open-source software under the GPL-3.0 license. The source code is on <a href="https://github.com/2Deathadder/coreboard">GitHub</a>.</p></details>
     </div>
   </div>
 </section>
@@ -463,12 +464,12 @@ footer nav { display: flex; gap: 20px; flex-wrap: wrap; }
 
 <footer>
   <div class="wrap">
-    <div>© 2026 Coreboard · Logiciel libre sous licence GPL-3.0<br>Coreboard n'est affilié ni à ASUS, ni à MSI, ni à Omarchy.</div>
-    <nav aria-label="Liens du pied de page">
+    <div>© 2026 Coreboard · Free software under the GPL-3.0 license<br>Coreboard is affiliated with neither ASUS, MSI nor Omarchy.</div>
+    <nav aria-label="Footer links">
       <a href="https://github.com/2Deathadder/coreboard">GitHub</a>
-      <a href="https://github.com/2Deathadder/coreboard/releases">Versions</a>
-      <a href="https://github.com/2Deathadder/coreboard/issues">Signaler un problème</a>
-      <a href="https://github.com/2Deathadder/coreboard/blob/master/LICENSE">Licence</a>
+      <a href="https://github.com/2Deathadder/coreboard/releases">Releases</a>
+      <a href="https://github.com/2Deathadder/coreboard/issues">Report an issue</a>
+      <a href="https://github.com/2Deathadder/coreboard/blob/master/LICENSE">License</a>
     </nav>
   </div>
 </footer>
@@ -513,7 +514,7 @@ document.querySelectorAll('[role="tablist"]').forEach(list => {
     tabs.forEach(o => o.setAttribute('aria-selected', o === t));
     if (t.dataset.img) {
       const img = document.getElementById('cap-img');
-      img.src = t.dataset.img; img.alt = 'Page ' + t.textContent + ' de Coreboard : ' + t.dataset.cap;
+      img.src = t.dataset.img; img.alt = 'Coreboard ' + t.textContent + ' page: ' + t.dataset.cap;
       document.getElementById('cap-txt').textContent = t.dataset.cap;
     }
     if (t.dataset.target) tabs.forEach(o => { document.getElementById(o.dataset.target).hidden = o !== t; });
@@ -525,8 +526,8 @@ document.querySelectorAll('.copy').forEach(b => b.addEventListener('click', asyn
   const code = b.parentElement.querySelector('code').cloneNode(true);
   code.querySelectorAll('.p, .c').forEach(n => n.remove());
   const text = code.textContent.split('\n').map(l => l.trim()).filter(Boolean).join('\n');
-  try { await navigator.clipboard.writeText(text); b.textContent = 'Copié'; } catch { b.textContent = 'Échec'; }
-  setTimeout(() => b.textContent = 'Copier', 1600);
+  try { await navigator.clipboard.writeText(text); b.textContent = 'Copied'; } catch { b.textContent = 'Failed'; }
+  setTimeout(() => b.textContent = 'Copy', 1600);
 }));
 </script>
 </body>

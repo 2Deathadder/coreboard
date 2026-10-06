@@ -8,11 +8,23 @@ import sys
 t = open("site-src/index.template.html").read()
 open("docs/index.html", "w").write(t.replace("{{WORDMARK}}", sys.argv[1]))
 PY
+mkdir -p docs/en
+python3 site-src/i18n_en.py docs/index.html docs/en/index.html
 DATE=$(date -u +%Y-%m-%d)
 cat > docs/sitemap.xml <<XML
 <?xml version="1.0" encoding="UTF-8"?>
-<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
-  <url><loc>https://2deathadder.github.io/coreboard/</loc><lastmod>$DATE</lastmod><changefreq>weekly</changefreq><priority>1.0</priority></url>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:xhtml="http://www.w3.org/1999/xhtml" xmlns:image="http://www.google.com/schemas/sitemap-image/1.1">
+  <url>
+    <loc>https://2deathadder.github.io/coreboard/</loc><lastmod>$DATE</lastmod><changefreq>weekly</changefreq><priority>1.0</priority>
+    <xhtml:link rel="alternate" hreflang="fr" href="https://2deathadder.github.io/coreboard/"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://2deathadder.github.io/coreboard/en/"/>
+    <image:image><image:loc>https://2deathadder.github.io/coreboard/img/og-image.jpg</image:loc></image:image>
+  </url>
+  <url>
+    <loc>https://2deathadder.github.io/coreboard/en/</loc><lastmod>$DATE</lastmod><changefreq>weekly</changefreq><priority>0.9</priority>
+    <xhtml:link rel="alternate" hreflang="fr" href="https://2deathadder.github.io/coreboard/"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://2deathadder.github.io/coreboard/en/"/>
+  </url>
 </urlset>
 XML
 printf 'User-agent: *\nAllow: /\n\nSitemap: https://2deathadder.github.io/coreboard/sitemap.xml\n' > docs/robots.txt

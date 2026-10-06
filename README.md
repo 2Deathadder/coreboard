@@ -1,5 +1,11 @@
 # Coreboard
 
+[![Site officiel](https://img.shields.io/badge/site-2deathadder.github.io%2Fcoreboard-ff1a3a)](https://2deathadder.github.io/coreboard/)
+[![Version](https://img.shields.io/github/v/release/2Deathadder/coreboard?color=ff1a3a)](https://github.com/2Deathadder/coreboard/releases/latest)
+[![Licence](https://img.shields.io/badge/licence-GPL--3.0-ff1a3a)](LICENSE)
+
+**Site officiel : [2deathadder.github.io/coreboard](https://2deathadder.github.io/coreboard/)** · [English](https://2deathadder.github.io/coreboard/en/)
+
 Centre de contrôle matériel **natif** pour Linux, écrit en C (GTK4 + Cairo/Pango), au style d'**Armoury Crate** (barre latérale, en-têtes à barres rouges, cartes GPU/CPU/Ventilateurs/Mémoire, modes de fonctionnement)
 (noir / rouge, ratio 16:9 conservé quelle que soit la taille de la fenêtre).
 Il détecte ce que ton PC expose réellement et **masque** ce qui n'existe pas.

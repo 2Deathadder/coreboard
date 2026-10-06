@@ -10,6 +10,8 @@
 <meta name="robots" content="index, follow, max-image-preview:large">
 <link rel="canonical" href="https://2deathadder.github.io/coreboard/">
 <link rel="alternate" hreflang="fr" href="https://2deathadder.github.io/coreboard/">
+<link rel="alternate" hreflang="en" href="https://2deathadder.github.io/coreboard/en/">
+<link rel="alternate" hreflang="x-default" href="https://2deathadder.github.io/coreboard/">
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
 <meta name="theme-color" content="#070506">
 
@@ -30,7 +32,9 @@
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&family=JetBrains+Mono:wght@400;500;700&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&family=JetBrains+Mono:wght@400;500;700&display=swap" media="print" onload="this.media='all'">
+<noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&family=JetBrains+Mono:wght@400;500;700&display=swap"></noscript>
 
 <script type="application/ld+json">
 {
@@ -81,10 +85,12 @@
   --border-strong: #3d272c;
   --brand: #ff1a3a;
   --brand-hover: #ff4560;
+  --btn: #e5112f;          /* rouge des boutons : contraste AA avec le texte blanc */
+  --btn-hover: #cc0d28;
   --brand-dim: #a80b22;
   --text: #f4eff0;
   --text-2: #c2b3b6;
-  --muted: #7d6c70;
+  --muted: #918084;
   --ok: #2be36f;
   --mono: "JetBrains Mono", ui-monospace, monospace;
   --sans: "Geist", system-ui, sans-serif;
@@ -109,13 +115,15 @@ header.nav .wrap { height: 100%; display: flex; align-items: center; gap: 28px; 
 .nav-links a:hover { color: var(--text); }
 .nav-right { margin-left: auto; display: flex; align-items: center; gap: 14px; }
 .icon-link { display: inline-flex; color: var(--text-2); }
+.lang { font: 500 12px var(--mono); color: var(--text-2); text-decoration: none; border: 1px solid var(--border-strong); border-radius: 4px; padding: 3px 7px; }
+.lang:hover { color: var(--text); border-color: var(--brand); }
 .icon-link:hover { color: var(--text); }
 
 /* boutons */
 .btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; padding: 9px 18px; border-radius: 6px; font: 500 13.5px var(--mono); text-decoration: none; border: 1px solid transparent; transition: background-color .15s, border-color .15s, transform .1s; cursor: pointer; white-space: nowrap; }
 .btn:active { transform: scale(.97); }
-.btn-primary { background: var(--brand); color: #fff; }
-.btn-primary:hover { background: var(--brand-hover); }
+.btn-primary { background: var(--btn); color: #fff; }
+.btn-primary:hover { background: var(--btn-hover); }
 .btn-ghost { border-color: var(--border-strong); color: var(--text); background: rgba(255,255,255,.02); }
 .btn-ghost:hover { border-color: var(--brand); }
 .btn-sm { padding: 6px 14px; font-size: 12.5px; }
@@ -162,7 +170,7 @@ section.deep .card { background: var(--bg); }
 .tabs { display: flex; gap: 6px; flex-wrap: wrap; margin: 36px 0 18px; }
 .tab { font: 500 12.5px var(--mono); padding: 7px 14px; border: 1px solid var(--border-strong); border-radius: 5px; background: transparent; color: var(--text-2); cursor: pointer; transition: all .15s; }
 .tab:hover { color: var(--text); }
-.tab[aria-selected="true"] { background: var(--brand); border-color: var(--brand); color: #fff; }
+.tab[aria-selected="true"] { background: var(--btn); border-color: var(--btn); color: #fff; }
 .gallery figure { margin: 0; }
 .gallery figcaption { margin-top: 14px; font: 13px var(--mono); color: var(--muted); }
 
@@ -238,6 +246,7 @@ footer nav { display: flex; gap: 20px; flex-wrap: wrap; }
       <a href="#faq">FAQ</a>
     </nav>
     <div class="nav-right">
+      <a class="lang" href="en/" hreflang="en" lang="en">EN</a>
       <a class="icon-link" href="https://github.com/2Deathadder/coreboard" aria-label="Code source sur GitHub" rel="noopener">
         <svg width="20" height="20" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
       </a>
@@ -353,10 +362,10 @@ footer nav { display: flex; gap: 20px; flex-wrap: wrap; }
         <button class="tab" role="tab" aria-selected="false" aria-controls="cap" data-img="img/ecran.webp" data-cap="Écran et GPU : mode GPU hybride, luminosité et filtre lumière bleue.">Écran &amp; GPU</button>
         <button class="tab" role="tab" aria-selected="false" aria-controls="cap" data-img="img/jeux-windows.webp" data-cap="Jeux Windows : environnement Proton prêt et diagnostic d'optimisation du système.">Jeux Windows</button>
       </div>
-      <figure id="cap" role="tabpanel">
+      <div id="cap" role="tabpanel"><figure>
         <div class="shot"><img id="cap-img" src="img/performances.webp" width="1280" height="700" loading="lazy" alt="Page Performances de Coreboard : profil, Turbo Boost, préférence énergétique, ventilateurs et températures"></div>
         <figcaption id="cap-txt">Performances : profil, Turbo Boost, préférence énergétique, ventilateurs et températures.</figcaption>
-      </figure>
+      </figure></div>
     </div>
   </div>
 </section>

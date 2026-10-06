@@ -90,7 +90,7 @@ void wg_save(void) {
         #define S(k, v) json_builder_set_member_name(b, k); json_builder_add_string_value(b, v)
         #define I(k, v) json_builder_set_member_name(b, k); json_builder_add_int_value(b, v)
         S("name", wg[i].name); S("exe", wg[i].exe); S("args", wg[i].args); S("prefix", wg[i].prefix);
-        I("appid", wg[i].appid); I("hud", wg[i].hud); I("gamemode", wg[i].gamemode); I("dlss", wg[i].dlss); I("rt", wg[i].rt); I("log", wg[i].log);
+        I("hidden", wg[i].hidden); I("appid", wg[i].appid); I("hud", wg[i].hud); I("gamemode", wg[i].gamemode); I("dlss", wg[i].dlss); I("rt", wg[i].rt); I("log", wg[i].log);
         I("preset", wg[i].preset); I("ntsync", wg[i].ntsync); I("shader_async", wg[i].shader_async); I("lowlat", wg[i].lowlat); I("dlss_up", wg[i].dlss_up);
         I("aniso", wg[i].aniso); I("fsr", wg[i].fsr); I("fsr_str", wg[i].fsr_str); I("fps_cap", wg[i].fps_cap);
         I("sr_preset", wg[i].sr_preset); I("fg", wg[i].fg); I("rr_latest", wg[i].rr_latest); I("dlss_ind", wg[i].dlss_ind);
@@ -117,7 +117,7 @@ void wg_init(void) {
             #define JI(k, d) (json_object_has_member(o, k) ? (int)json_object_get_int_member(o, k) : (d))
             g_strlcpy(w->name, JS("name"), sizeof w->name); g_strlcpy(w->exe, JS("exe"), sizeof w->exe);
             g_strlcpy(w->args, JS("args"), sizeof w->args); g_strlcpy(w->prefix, JS("prefix"), sizeof w->prefix);
-            w->appid = JI("appid", 0); w->hud = JI("hud", 0); w->gamemode = JI("gamemode", 1); w->dlss = JI("dlss", 1); w->rt = JI("rt", 0); w->log = JI("log", 0);
+            w->hidden = JI("hidden", 0); w->appid = JI("appid", 0); w->hud = JI("hud", 0); w->gamemode = JI("gamemode", 1); w->dlss = JI("dlss", 1); w->rt = JI("rt", 0); w->log = JI("log", 0);
             w->preset = JI("preset", 2); w->ntsync = JI("ntsync", 1); w->shader_async = JI("shader_async", 1); w->lowlat = JI("lowlat", 0); w->dlss_up = JI("dlss_up", 1);
             w->aniso = JI("aniso", 1); w->fsr = JI("fsr", 0); w->fsr_str = JI("fsr_str", 2); w->fps_cap = JI("fps_cap", 0);
             w->sr_preset = JI("sr_preset", 0); w->fg = JI("fg", 0); w->rr_latest = JI("rr_latest", 0); w->dlss_ind = JI("dlss_ind", 0);
@@ -236,8 +236,34 @@ void wg_install_deps(void (*done)(gboolean, gpointer), gpointer d) {
 /* ------------------------------------------------------------------ lancement */
 static void child_setup(gpointer d) { (void)d; setsid(); }         /* groupe de processus dédié : « Arrêter » tue tout le jeu */
 
+static void stop_xvfb(WinGame *w) {
+    if (w->xvfb_pid) { kill(w->xvfb_pid, SIGTERM); g_spawn_close_pid(w->xvfb_pid); w->xvfb_pid = 0; }
+    w->display[0] = 0;
+}
+
+/* écran virtuel invisible (Xvfb) : les fenêtres de Wine s'y affichent sans jamais apparaître sur le bureau */
+static gboolean start_xvfb(WinGame *w) {
+    if (!compat_has("Xvfb")) return FALSE;
+    for (int n = 91; n < 140; n++) {
+        char lock[64], sock[64]; g_snprintf(lock, sizeof lock, "/tmp/.X%d-lock", n); g_snprintf(sock, sizeof sock, "/tmp/.X11-unix/X%d", n);
+        if (g_file_test(lock, G_FILE_TEST_EXISTS) || g_file_test(sock, G_FILE_TEST_EXISTS)) continue;
+        char disp[16]; g_snprintf(disp, sizeof disp, ":%d", n);
+        const char *argv[] = {"Xvfb", disp, "-screen", "0", "1280x800x24", "-nolisten", "tcp", NULL};
+        GPid pid = 0;
+        if (!g_spawn_async(NULL, (char **)argv, NULL, G_SPAWN_SEARCH_PATH | G_SPAWN_DO_NOT_REAP_CHILD | G_SPAWN_STDOUT_TO_DEV_NULL | G_SPAWN_STDERR_TO_DEV_NULL, NULL, NULL, &pid, NULL)) return FALSE;
+        for (int t = 0; t < 40 && !g_file_test(sock, G_FILE_TEST_EXISTS); t++) g_usleep(50000);   /* prêt en moins de 2 s */
+        if (!g_file_test(sock, G_FILE_TEST_EXISTS)) { kill(pid, SIGTERM); g_spawn_close_pid(pid); return FALSE; }
+        w->xvfb_pid = pid; g_strlcpy(w->display, disp, sizeof w->display);
+        return TRUE;
+    }
+    return FALSE;
+}
+
+const char *wg_display(int i) { return i >= 0 && i < nwg && wg[i].display[0] ? wg[i].display : NULL; }
+
 static void on_exit_cb(GPid pid, gint status, gpointer d) {
     int i = GPOINTER_TO_INT(d);
+    if (i >= 0 && i < nwg && wg[i].pid == pid) stop_xvfb(&wg[i]);
     if (i >= 0 && i < nwg && wg[i].pid == pid) {
         wg[i].running = FALSE; wg[i].pid = 0; fan_game_end();
         if (WIFEXITED(status) && WEXITSTATUS(status) == 0) g_strlcpy(wg[i].status, "Terminé", sizeof wg[i].status);
@@ -313,13 +339,18 @@ void wg_launch(int i) {
     if (w->args[0]) { gchar **av; gint ac; if (g_shell_parse_argv(w->args, &ac, &av, NULL)) { for (int k = 0; k < ac; k++) g_ptr_array_add(a, g_strdup(av[k])); g_strfreev(av); } }
     g_ptr_array_add(a, NULL);
 
+    if (w->hidden && start_xvfb(w)) {                                  /* aucune fenêtre visible : écran virtuel, pilote X11 de Wine */
+        env = g_environ_setenv(env, "DISPLAY", w->display, TRUE);
+        env = g_environ_unsetenv(env, "WAYLAND_DISPLAY");
+        env = g_environ_setenv(env, "PROTON_ENABLE_WAYLAND", "0", TRUE);
+    }
     gchar *cwd = g_path_get_dirname(w->exe);
     FILE *lf = fopen(logp, "a"); if (lf) { fprintf(lf, "\n=== Lancement de %s (%s) ===\n", w->name, id); fclose(lf); }
     GError *err = NULL; GPid pid = 0;
     if (g_spawn_async(cwd, (char **)a->pdata, env, G_SPAWN_SEARCH_PATH | G_SPAWN_DO_NOT_REAP_CHILD | G_SPAWN_STDOUT_TO_DEV_NULL | G_SPAWN_STDERR_TO_DEV_NULL, child_setup, NULL, &pid, &err)) {
         w->pid = pid; w->running = TRUE; g_strlcpy(w->status, "Démarrage… (le premier lancement prépare Proton et peut être long)", sizeof w->status);
         g_child_watch_add(pid, on_exit_cb, GINT_TO_POINTER(i));
-    } else { g_snprintf(w->status, sizeof w->status, "Échec : %s", err->message); g_error_free(err); }
+    } else { g_snprintf(w->status, sizeof w->status, "Échec : %s", err->message); g_error_free(err); stop_xvfb(w); }
     g_free(cwd); g_strfreev(env); g_ptr_array_free(a, TRUE);
 }
 

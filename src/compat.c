@@ -102,6 +102,7 @@ static const struct { const char *logical, *pm[4]; } PKGS[] = {
     {"brightnessctl",  {"brightnessctl", "brightnessctl", "brightnessctl", "brightnessctl"}},
     {"xdotool",        {"xdotool", "xdotool", "xdotool", "xdotool"}},
     {"xprop",          {"xorg-xprop", "x11-utils", "xprop", "xprop"}},
+    {"xvfb",           {"xorg-server-xvfb", "xvfb", "xorg-x11-server-Xvfb", "xorg-x11-server-Xvfb"}},
     {"wtype",          {"wtype", "wtype", "wtype", "wtype"}},
     {"ydotool",        {"ydotool", "ydotool", "ydotool", "ydotool"}},
     {"7zip",           {"7zip", "7zip", "p7zip p7zip-plugins", "7zip"}},

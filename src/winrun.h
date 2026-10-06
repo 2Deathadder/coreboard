@@ -16,6 +16,8 @@ typedef struct {
     char dlss_info[160];                      /* versions DLSS trouvées dans le dossier du jeu */
     int arch32, dx12;          /* issus de l'analyse PE */
     char info[200], warn[240]; int kernel_ac, analyzed;   /* résultat de l'analyse PE (voir pe.h) */
+    int hidden;                /* fenêtres invisibles : lancé sur un écran virtuel Xvfb (installateurs automatiques) */
+    GPid xvfb_pid; char display[16];   /* écran virtuel en cours (":91"…), vide sinon */
 } WinGame;
 
 typedef struct { gboolean umu, proton, gamemode, mangohud; } WgTools;
@@ -29,6 +31,7 @@ void wg_apply_preset(int i, int preset);   /* règle les options d'amélioration
 const char *wg_preset_name(int p);
 void wg_launch(int i);
 void wg_stop(int i);
+const char *wg_display(int i);            /* écran virtuel d'un jeu lancé en mode invisible, ou NULL */
 void wg_refresh_status(void);             /* relit la dernière ligne du journal des jeux en cours */
 WgTools wg_tools(void);
 const char *wg_log_path(int i, char *buf, size_t n);

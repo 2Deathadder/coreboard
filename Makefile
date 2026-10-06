@@ -16,11 +16,11 @@ check:
 
 # dépendances de compilation et d'exécution selon la distribution (demande le mot de passe)
 deps:
-	@if command -v pacman >/dev/null; then sudo pacman -S --needed base-devel gtk4 json-glib fontconfig python curl 7zip; \
-	elif command -v apt-get >/dev/null; then sudo apt-get install -y build-essential pkg-config libgtk-4-dev libjson-glib-dev libfontconfig-dev python3 curl 7zip; \
-	elif command -v dnf >/dev/null; then sudo dnf install -y gcc make pkgconf-pkg-config gtk4-devel json-glib-devel fontconfig-devel python3 curl p7zip p7zip-plugins; \
-	elif command -v zypper >/dev/null; then sudo zypper install -y gcc make pkg-config gtk4-devel json-glib-devel fontconfig-devel python3 curl 7zip; \
-	else echo "Distribution non reconnue : installe gcc, make, pkg-config, gtk4 (dev), json-glib (dev), fontconfig (dev), python3, curl, 7-Zip"; exit 1; fi
+	@if command -v pacman >/dev/null; then sudo pacman -S --needed base-devel gtk4 json-glib fontconfig python curl 7zip xorg-server-xvfb; \
+	elif command -v apt-get >/dev/null; then sudo apt-get install -y build-essential pkg-config libgtk-4-dev libjson-glib-dev libfontconfig-dev python3 curl 7zip xvfb; \
+	elif command -v dnf >/dev/null; then sudo dnf install -y gcc make pkgconf-pkg-config gtk4-devel json-glib-devel fontconfig-devel python3 curl p7zip p7zip-plugins xorg-x11-server-Xvfb; \
+	elif command -v zypper >/dev/null; then sudo zypper install -y gcc make pkg-config gtk4-devel json-glib-devel fontconfig-devel python3 curl 7zip xorg-x11-server-Xvfb; \
+	else echo "Distribution non reconnue : installe gcc, make, pkg-config, gtk4 (dev), json-glib (dev), fontconfig (dev), python3, curl, 7-Zip, Xvfb"; exit 1; fi
 
 .PHONY: check deps
 

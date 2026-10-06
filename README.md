@@ -13,7 +13,7 @@ Le paquet installe aussi le démon de refroidissement et la règle udev du clavi
 
 ## Compilation / installation
 
-Dépendances : `gcc`, `make`, `pkg-config`, GTK ≥ 4.10, json-glib ≥ 1.6, `fontconfig`, `python3`, `curl`, 7-Zip (extraction des repacks FitGirl)
+Dépendances : `gcc`, `make`, `pkg-config`, GTK ≥ 4.10, json-glib ≥ 1.6, `fontconfig`, `python3`, `curl`, 7-Zip et Xvfb (extraction et installation invisible des repacks FitGirl)
 (Arch et dérivées, Ubuntu 24.04+, Debian 13+, Fedora 38+, openSUSE Tumbleweed). `make deps` les installe pour la distribution détectée.
 
     make deps            # dépendances de compilation (pacman, apt, dnf ou zypper)

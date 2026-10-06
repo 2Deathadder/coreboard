@@ -474,12 +474,13 @@ footer nav { display: flex; gap: 20px; flex-wrap: wrap; }
 </footer>
 
 <script>
-/* champ de pixels du héros : grille de carrés rouges qui scintillent doucement */
+/* champ de pixels du héros : grille de carrés rouges qui scintillent doucement.
+   Démarre une fois la page chargée et au repos, à 15 images/s, dessins regroupés par couleur : rien ne bloque l'affichage. */
 (function () {
   const cv = document.getElementById('pixels'), ctx = cv.getContext('2d');
   const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
   const COLORS = ['#3a0a12', '#5c0d1a', '#8a1022', '#c8102e', '#ff1a3a'];
-  let cells = [], step = 18, w = 0, h = 0, raf = 0, visible = true;
+  let cells = [], step = 18, w = 0, h = 0, raf = 0, visible = true, last = 0;
   function build() {
     const dpr = Math.min(devicePixelRatio || 1, 2), r = cv.getBoundingClientRect();
     w = r.width; h = r.height; cv.width = w * dpr; cv.height = h * dpr; ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
@@ -490,20 +491,32 @@ footer nav { display: flex; gap: 20px; flex-wrap: wrap; }
     }
   }
   function draw(time) {
-    ctx.clearRect(0, 0, w, h);
-    const sz = step - 6;
-    for (const p of cells) {
-      const k = reduce ? 0.5 : (Math.sin(p.t + time * 0.001 * p.s) + 1) / 2;
-      ctx.fillStyle = COLORS[Math.min(4, p.c + (k > 0.92 ? 2 : k > 0.75 ? 1 : 0))];
-      ctx.globalAlpha = 0.25 + k * 0.55;
-      ctx.fillRect(p.x, p.y, sz, sz);
+    if (time - last >= 66 || reduce) {
+      last = time;
+      ctx.clearRect(0, 0, w, h);
+      const sz = step - 6, buckets = [];                    // [couleur][palier d'opacité] → cases
+      for (const p of cells) {
+        const k = reduce ? 0.5 : (Math.sin(p.t + time * 0.001 * p.s) + 1) / 2;
+        const ci = Math.min(4, p.c + (k > 0.92 ? 2 : k > 0.75 ? 1 : 0)), ai = Math.round((0.25 + k * 0.55) * 4);
+        ((buckets[ci] ||= [])[ai] ||= []).push(p);
+      }
+      buckets.forEach((byA, ci) => byA && byA.forEach((list, ai) => {
+        if (!list) return;
+        ctx.fillStyle = COLORS[ci]; ctx.globalAlpha = ai / 4; ctx.beginPath();
+        for (const p of list) ctx.rect(p.x, p.y, sz, sz);
+        ctx.fill();
+      }));
+      ctx.globalAlpha = 1;
     }
-    ctx.globalAlpha = 1;
     if (!reduce && visible) raf = requestAnimationFrame(draw);
   }
-  build(); draw(0);
-  addEventListener('resize', () => { build(); if (reduce) draw(0); });
-  new IntersectionObserver(([e]) => { visible = e.isIntersecting; cancelAnimationFrame(raf); if (visible && !reduce) raf = requestAnimationFrame(draw); }).observe(cv);
+  function start() {
+    build(); draw(0);
+    addEventListener('resize', () => { build(); if (reduce) draw(0); });
+    new IntersectionObserver(([e]) => { visible = e.isIntersecting; cancelAnimationFrame(raf); if (visible && !reduce) raf = requestAnimationFrame(draw); }).observe(cv);
+  }
+  const idle = window.requestIdleCallback || (f => setTimeout(f, 200));
+  if (document.readyState === 'complete') idle(start); else addEventListener('load', () => idle(start));
 })();
 
 /* onglets : captures et installation */

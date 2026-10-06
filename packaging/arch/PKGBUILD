@@ -1,0 +1,47 @@
+# Maintainer: windark <thomwinner2007 at gmail dot com>
+pkgname=coreboard-git
+_pkgname=coreboard
+pkgver=1.0.0
+pkgrel=1
+pkgdesc="Native hardware control center for Linux (GTK4), Armoury Crate style: profiles, CPU/GPU, display, RGB, scenarios, games"
+arch=('x86_64' 'aarch64')
+url="https://github.com/2Deathadder/coreboard"
+license=('GPL-3.0-or-later')
+depends=('gtk4' 'json-glib' 'fontconfig' 'glib2' 'pango' 'cairo' 'gdk-pixbuf2' 'python' 'curl' 'polkit' 'hicolor-icon-theme')
+makedepends=('pkgconf' 'git')
+provides=('coreboard')
+conflicts=('coreboard')
+optdepends=(
+  'power-profiles-daemon: power profiles'
+  'brightnessctl: backlight control (systemd-logind is used otherwise)'
+  'libpulse: volume control and music-reactive lighting (pactl, parec)'
+  'networkmanager: Wi-Fi information'
+  'upower: battery of peripherals'
+  'xorg-xprop: active window detection on X11/XWayland (scenarios)'
+  'wtype: macro playback on wlroots compositors'
+  'xdotool: macro playback on X11'
+  'ydotool: macro playback on GNOME/KDE Wayland'
+  'gammastep: blue light filter outside GNOME/KDE'
+  'umu-launcher: run Windows games with Proton'
+  'gamemode: CPU tuning while gaming'
+  'mangohud: performance overlay and frame limiter'
+  'supergfxctl: hybrid GPU mode switching'
+  '7zip: archive extraction'
+)
+source=("$_pkgname::git+$url.git")
+sha256sums=('SKIP')
+
+pkgver() {
+  cd "$_pkgname"
+  git describe --long --tags --abbrev=7 | sed 's/^v//;s/\([^-]*-g\)/r\1/;s/-/./g'
+}
+
+build() {
+  cd "$_pkgname"
+  make PREFIX=/usr FAND_DIR=/usr/lib/coreboard
+}
+
+package() {
+  cd "$_pkgname"
+  make PREFIX=/usr FAND_DIR=/usr/lib/coreboard DESTDIR="$pkgdir" install install-system
+}

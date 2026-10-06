@@ -464,8 +464,11 @@ static void model_slug(const char *model, char *slug, size_t max) {
 }
 
 /* photo de l'appareil : devices/<modèle>.png dans ~/.local/share/coreboard ou DATADIR (nom = modèle en minuscules, tirets) */
+static int import_image(const char *src);
+static cairo_surface_t *img; static gboolean tried;     /* photo de l'appareil (rechargée après un import) */
+static void device_image_reload(void) { if (img) cairo_surface_destroy(img); img = NULL; tried = FALSE; }
+
 static gboolean device_image(cairo_t *cr, double cx, double cy) {
-    static cairo_surface_t *img; static gboolean tried;
     if (!tried && hw.model[0]) {
         tried = TRUE;
         char slug[96]; model_slug(hw.model, slug, sizeof slug);
@@ -511,10 +514,78 @@ static void laptop(cairo_t *cr, double cx, double cy) {
     cairo_restore(cr);
 }
 
+/* PC de bureau stylisé (écran + tour), même palette que le portable */
+static void desktop_pc(cairo_t *cr, double cx, double cy) {
+    cairo_save(cr); cairo_translate(cr, cx - 200, cy - 118); cairo_scale(cr, 1.43, 1.43);
+    /* écran */
+    cairo_rectangle(cr, 18, 10, 190, 112); rgba(cr, 0x2a2a2e, 1); cairo_fill(cr);
+    cairo_rectangle(cr, 21, 13, 184, 104);
+    cairo_pattern_t *p = cairo_pattern_create_linear(21, 13, 205, 117);
+    cairo_pattern_add_color_stop_rgb(p, 0, 0x12 / 255.0, 0x0a / 255.0, 0x3a / 255.0); cairo_pattern_add_color_stop_rgb(p, .55, 0x2a / 255.0, 0x0c / 255.0, 0x5a / 255.0);
+    cairo_pattern_add_color_stop_rgb(p, 1, 0x60 / 255.0, 0x06 / 255.0, 0x2a / 255.0);
+    cairo_set_source(cr, p); cairo_fill(cr); cairo_pattern_destroy(p);
+    cairo_move_to(cr, 82, 74); cairo_curve_to(cr, 99, 40, 139, 40, 149, 62); cairo_curve_to(cr, 124, 54, 109, 64, 86, 84);
+    rgba(cr, 0xd9d0ff, 0.9); cairo_set_line_width(cr, 3); cairo_stroke(cr);
+    cairo_move_to(cr, 60, 92); cairo_line_to(cr, 168, 92); rgba(cr, C_RED, 0.8); cairo_set_line_width(cr, 1.5); cairo_stroke(cr);
+    /* pied */
+    cairo_rectangle(cr, 104, 122, 18, 16); rgba(cr, 0x3a3a3f, 1); cairo_fill(cr);
+    cairo_rectangle(cr, 78, 138, 70, 6); rgba(cr, 0x3a3a3f, 1); cairo_fill(cr);
+    /* tour */
+    cairo_rectangle(cr, 222, 18, 62, 126); rgba(cr, 0x2a2a2e, 1); cairo_fill(cr);
+    cairo_rectangle(cr, 222.5, 18.5, 61, 125); rgba(cr, 0x3a3a3f, 1); cairo_set_line_width(cr, 1); cairo_stroke(cr);
+    for (int i = 0; i < 3; i++) {                                        /* ventilateurs RGB en façade */
+        cairo_arc(cr, 253, 46 + i * 34, 12, 0, 2 * G_PI);
+        guint32 c = i == 0 ? 0x3a6aff : i == 1 ? 0xa030d0 : 0xff143a;
+        rgba(cr, c, 0.9); cairo_set_line_width(cr, 2.2); cairo_stroke(cr);
+        cairo_arc(cr, 253, 46 + i * 34, 3, 0, 2 * G_PI); rgba(cr, c, 0.6); cairo_fill(cr);
+    }
+    cairo_rectangle(cr, 230, 136, 46, 2); rgba(cr, C_RED, 0.8); cairo_fill(cr);
+    cairo_restore(cr);
+}
+
+/* type de châssis SMBIOS : portable, convertible, tablette… sinon PC de bureau */
+static gboolean is_laptop_chassis(void) {
+    static int r = -1;
+    if (r < 0) {
+        gchar *t = NULL; int ct = 0;
+        if (g_file_get_contents("/sys/class/dmi/id/chassis_type", &t, NULL, NULL)) ct = atoi(t);
+        g_free(t);
+        r = ct == 8 || ct == 9 || ct == 10 || ct == 11 || ct == 14 || ct == 30 || ct == 31 || ct == 32 || ct == 0;  /* 0 : inconnu → portable */
+    }
+    return r;
+}
+
+static void on_photo_chosen(GObject *src, GAsyncResult *res, gpointer d) {
+    (void)d;
+    GFile *f = gtk_file_dialog_open_finish(GTK_FILE_DIALOG(src), res, NULL);
+    if (!f) return;
+    gchar *path = g_file_get_path(f); g_object_unref(f);
+    if (path && import_image(path) == 0) { device_image_reload(); show_toast("Photo de l'appareil enregistrée"); }
+    else if (path) show_toast("Image illisible ou vide");
+    g_free(path);
+    if (area) gtk_widget_queue_draw(area);
+}
+
+/* photo de son PC : n'importe quelle image (le fond blanc est retiré et l'image recadrée) */
+static void pick_device_photo(void) {
+    GtkFileDialog *d = gtk_file_dialog_new();
+    gtk_file_dialog_set_title(d, "Photo de ton PC (idéalement sur fond blanc)");
+    GtkFileFilter *ff = gtk_file_filter_new(); gtk_file_filter_set_name(ff, "Images"); gtk_file_filter_add_mime_type(ff, "image/*");
+    GListStore *fl = g_list_store_new(GTK_TYPE_FILE_FILTER); g_list_store_append(fl, ff);
+    gtk_file_dialog_set_filters(d, G_LIST_MODEL(fl)); gtk_file_dialog_set_default_filter(d, ff);
+    gtk_file_dialog_open(d, GTK_WINDOW(win), NULL, on_photo_chosen, NULL);
+    g_object_unref(ff); g_object_unref(fl); g_object_unref(d);
+}
+
 /* bloc appareil : photo, nom, CPU/GPU, bouton — cy = centre vertical de la photo */
 static void home_device(cairo_t *cr, double lx, double cy) {
     HwState *s = &hw;
-    if (!device_image(cr, lx, cy)) laptop(cr, lx, cy);
+    gboolean photo = device_image(cr, lx, cy);
+    if (!photo) { if (is_laptop_chassis()) laptop(cr, lx, cy); else desktop_pc(cr, lx, cy); }
+    if (hit(lx - 200, cy - 125, 400, 250)) {                 /* survol : invite à mettre sa propre photo */
+        text(cr, photo ? "Cliquer pour changer la photo" : "Cliquer pour ajouter une photo de ton PC", lx, cy + 135, 11.5, 600, F_SANS, C_LABEL, 1, 1, 0);
+    }
+    if (clicked(lx - 200, cy - 125, 400, 250)) pick_device_photo();
     gchar *mu = g_utf8_strup(s->model, -1);
     text(cr, mu, lx, cy + 156, 19, 800, F_ORB, C_TEXT, 1, 1, 1);
     g_free(mu);

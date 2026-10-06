@@ -42,13 +42,13 @@ test: tests/hwtest.c src/hw.c src/hw.h
 D := $(DESTDIR)$(PREFIX)
 install: coreboard
 	# ne supprime que les fichiers installés : ce dossier contient aussi les données utilisateur (préfixes Wine, journaux, téléchargements)
-	rm -rf $(D)/share/coreboard/fonts $(D)/share/coreboard/devices
+	# devices/ n'est jamais touché : la photo de l'appareil (coreboard --set-image) y est rangée
+	rm -rf $(D)/share/coreboard/fonts
 	rm -f $(D)/share/coreboard/coreboard-fand   # ancien emplacement du démon root (modifiable par l'utilisateur)
 	install -Dm755 coreboard $(D)/bin/coreboard
 	install -Dm644 data/fonts/Orbitron.ttf $(D)/share/coreboard/fonts/Orbitron.ttf
 	install -Dm644 data/fonts/Rajdhani-Medium.ttf $(D)/share/coreboard/fonts/Rajdhani-Medium.ttf
 	install -Dm644 data/fonts/Rajdhani-Bold.ttf $(D)/share/coreboard/fonts/Rajdhani-Bold.ttf
-	-install -Dm644 data/devices/*.png -t $(D)/share/coreboard/devices
 	install -Dm644 data/sounds/startup.ogg $(D)/share/coreboard/sounds/startup.ogg
 	install -Dm755 data/fistgirl_helper.py $(D)/share/coreboard/fistgirl_helper.py
 	-[ -f fistgirl/add-on/get_ff_link.py ] && install -Dm755 fistgirl/add-on/get_ff_link.py $(D)/share/coreboard/get_ff_link.py
@@ -66,7 +66,7 @@ install-system:
 	install -Dm644 LICENSE $(DESTDIR)$(PREFIX)/share/licenses/coreboard/LICENSE
 
 uninstall:
-	rm -rf $(D)/share/coreboard/fonts $(D)/share/coreboard/devices $(D)/share/coreboard/sounds $(D)/share/coreboard/fistgirl_helper.py $(D)/share/coreboard/get_ff_link.py $(D)/bin/coreboard $(D)/share/applications/coreboard.desktop $(D)/share/icons/hicolor/scalable/apps/coreboard.svg
+	rm -rf $(D)/share/coreboard/fonts $(D)/share/coreboard/sounds $(D)/share/coreboard/fistgirl_helper.py $(D)/share/coreboard/get_ff_link.py $(D)/bin/coreboard $(D)/share/applications/coreboard.desktop $(D)/share/icons/hicolor/scalable/apps/coreboard.svg
 	-update-desktop-database $(D)/share/applications 2>/dev/null
 
 .PHONY: install install-system uninstall

@@ -4,6 +4,13 @@ Centre de contrôle matériel **natif** pour Linux, écrit en C (GTK4 + Cairo/Pa
 (noir / rouge, ratio 16:9 conservé quelle que soit la taille de la fenêtre).
 Il détecte ce que ton PC expose réellement et **masque** ce qui n'existe pas.
 
+## Installation (Arch et dérivées)
+
+    git clone https://github.com/2Deathadder/coreboard.git
+    cd coreboard/packaging/arch && makepkg -si
+
+Le paquet installe aussi le démon de refroidissement et la règle udev du clavier RGB (aucune étape `sudo make` en plus).
+
 ## Compilation / installation
 
 Dépendances : `gcc`, `make`, `pkg-config`, GTK ≥ 4.10, json-glib ≥ 1.6, `fontconfig`, `python3`, `curl`
@@ -91,8 +98,9 @@ Sway : `bindsym $mod+Alt+r exec coreboard --toggle`).
 
 ## Photo de l'appareil
 
-La page d'accueil affiche la photo de ton PC si `~/.local/share/coreboard/devices/<modèle>.png` existe (sinon un portable dessiné).
-Pour en ajouter une, prends n'importe quelle image (idéalement sur fond blanc) et importe-la : le fond blanc est supprimé et l'image recadrée.
+La page d'accueil affiche la photo de ton PC si `~/.local/share/coreboard/devices/<modèle>.png` existe ; sinon un
+portable ou un PC de bureau dessiné, selon le type de châssis détecté. Clique sur l'image pour choisir ta photo
+(idéalement sur fond blanc) : le fond blanc est supprimé et l'image recadrée. Aucune photo de constructeur n'est fournie.
 
     coreboard --set-image ~/Downloads/mon-pc.jpg
     coreboard --set-image https://i.pinimg.com/…/image.jpg    # URL directe d'image (clic droit → copier l'adresse de l'image)

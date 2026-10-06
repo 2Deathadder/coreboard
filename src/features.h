@@ -154,5 +154,16 @@ void     fx_fg_download(const char *dest_dir);  /* démarre le téléchargement 
 void     fx_fg_cancel(void);                     /* annule et supprime les fichiers temporaires */
 FgDlStatus fx_fg_dl_status(void);
 
+/* Extraction du repack téléchargé (7-Zip ou unrar) puis repérage de l'installateur setup.exe */
+typedef struct {
+    gboolean active, done, error;
+    int pct;                         /* progression de l'extraction (0-100) */
+    char msg[200], setup[512], dest[512];
+} FgExStatus;
+gboolean fx_fg_extract_tool(void);               /* 7z, 7zz ou unrar présent */
+void     fx_fg_extract(const char *dir);         /* lance en tâche de fond */
+FgExStatus fx_fg_ex_status(void);
+void     fx_fg_ex_reset(void);
+
 #endif
 

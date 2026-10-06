@@ -1340,7 +1340,7 @@ static gpointer fg_resolve_thread(gpointer d) {
 static void fg_dl_reset_idle(void);
 
 void fx_fg_resolve(const char *url) {
-    fg_dl_reset_idle();                                  /* l'état terminé/erreur concernait le jeu précédent */
+    fg_dl_reset_idle(); fx_fg_ex_reset();                                  /* l'état terminé/erreur concernait le jeu précédent */
     g_mutex_lock(&fg_resolve_lock);
     fg_resolved = FALSE; fg_resolve_error = FALSE; fg_resolve_busy = TRUE;
     fg_game_title[0] = '\0'; fg_resolve_msg[0] = 0; fg_file_count_cache = 0; fg_optional_count = 0;
@@ -1522,3 +1522,58 @@ void fx_fg_cancel(void) {
     g_mutex_unlock(&fg_dl_lock);
 }
 
+/* ---- Extraction et installateur ---- */
+static GMutex fg_ex_lock;
+static FgExStatus fg_ex;
+
+gboolean fx_fg_extract_tool(void) { return compat_has("7z") || compat_has("7zz") || compat_has("unrar"); }
+FgExStatus fx_fg_ex_status(void) { g_mutex_lock(&fg_ex_lock); FgExStatus s = fg_ex; g_mutex_unlock(&fg_ex_lock); return s; }
+void fx_fg_ex_reset(void) { g_mutex_lock(&fg_ex_lock); if (!fg_ex.active) memset(&fg_ex, 0, sizeof fg_ex); g_mutex_unlock(&fg_ex_lock); }
+
+static void fg_ex_event(const char *line) {
+    if (!line || *line != '{') return;
+    JsonParser *jp = json_parser_new();
+    if (!json_parser_load_from_data(jp, line, -1, NULL) || !JSON_NODE_HOLDS_OBJECT(json_parser_get_root(jp))) { g_object_unref(jp); return; }
+    JsonObject *o = json_node_get_object(json_parser_get_root(jp));
+    const char *ev = jstr(o, "event");
+    g_mutex_lock(&fg_ex_lock);
+    if (!strcmp(ev, "extract_start")) { g_strlcpy(fg_ex.dest, jstr(o, "dest"), sizeof fg_ex.dest); g_strlcpy(fg_ex.msg, "Extraction…", sizeof fg_ex.msg); }
+    else if (!strcmp(ev, "extract_progress")) fg_ex.pct = (int)json_object_get_int_member_with_default(o, "pct", fg_ex.pct);
+    else if (!strcmp(ev, "extract_completed")) {
+        fg_ex.done = TRUE; fg_ex.pct = 100;
+        g_strlcpy(fg_ex.setup, jstr(o, "setup_exe"), sizeof fg_ex.setup);
+        g_strlcpy(fg_ex.msg, fg_ex.setup[0] ? "Extraction terminée" : "Extraction terminée, mais aucun installateur (.exe) trouvé", sizeof fg_ex.msg);
+        if (!fg_ex.setup[0]) fg_ex.error = TRUE;
+    } else if (json_object_has_member(o, "error")) { fg_ex.error = TRUE; g_strlcpy(fg_ex.msg, jstr(o, "error"), sizeof fg_ex.msg); }
+    g_mutex_unlock(&fg_ex_lock);
+    g_object_unref(jp);
+}
+
+static gpointer fg_ex_thread(gpointer d) {
+    gchar *dir = d;
+    const char *argv[] = {"python3", fg_helper_path(), "extract", dir, NULL};
+    GSubprocess *proc = g_subprocess_newv(argv, G_SUBPROCESS_FLAGS_STDOUT_PIPE | G_SUBPROCESS_FLAGS_STDERR_SILENCE, NULL);
+    if (proc) {
+        GDataInputStream *dat = g_data_input_stream_new(g_subprocess_get_stdout_pipe(proc));
+        char *line; gsize len;
+        while ((line = g_data_input_stream_read_line(dat, &len, NULL, NULL))) { fg_ex_event(line); g_free(line); }
+        g_object_unref(dat);
+        g_subprocess_wait(proc, NULL, NULL);
+        g_object_unref(proc);
+    }
+    g_mutex_lock(&fg_ex_lock);
+    if (!fg_ex.done && !fg_ex.error) { fg_ex.error = TRUE; g_strlcpy(fg_ex.msg, proc ? "Extraction interrompue" : "Impossible de lancer fistgirl_helper.py", sizeof fg_ex.msg); }
+    fg_ex.active = FALSE;
+    g_mutex_unlock(&fg_ex_lock);
+    g_free(dir);
+    return NULL;
+}
+
+void fx_fg_extract(const char *dir) {
+    g_mutex_lock(&fg_ex_lock);
+    if (fg_ex.active) { g_mutex_unlock(&fg_ex_lock); return; }
+    memset(&fg_ex, 0, sizeof fg_ex); fg_ex.active = TRUE;
+    g_strlcpy(fg_ex.msg, "Préparation de l'extraction…", sizeof fg_ex.msg);
+    g_mutex_unlock(&fg_ex_lock);
+    g_thread_unref(g_thread_new("coreboard-fg-extract", fg_ex_thread, g_strdup(dir)));
+}

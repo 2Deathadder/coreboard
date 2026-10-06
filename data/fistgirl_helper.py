@@ -682,61 +682,67 @@ def run_download_job(resolved_json_path, target_dir):
 # -----------------------------------------------------------------------------
 # Extraction des archives et détection de setup.exe
 # -----------------------------------------------------------------------------
+def extract_tool():
+    """Outil capable de lire les RAR en plusieurs volumes de FitGirl : 7-Zip (7z, 7zz) ou unrar."""
+    for t in ("7z", "7zz", "unrar"):
+        if shutil.which(t):
+            return t
+    return None
+
+
 def extract_archives(download_dir, extract_dir=None):
     """
-    Détecte et extrait les archives téléchargées (.rar, .zip, .7z) vers le dossier d'extraction.
-    Recherche ensuite l'exécutable d'installation (setup.exe ou équivalent).
+    Extrait le repack (premier volume .part01.rar, ou archive unique) dans download_dir/extracted,
+    avec la progression en direct, puis cherche l'installateur (setup.exe).
     """
     src = Path(download_dir).expanduser().resolve()
-    if not extract_dir:
-        extract_dir = src / "extracted"
-    dest = Path(extract_dir).expanduser().resolve()
+    dest = Path(extract_dir).expanduser().resolve() if extract_dir else src / "extracted"
     dest.mkdir(parents=True, exist_ok=True)
 
-    # Recherche la première archive (.part01.rar, .part1.rar ou .rar unique)
-    archives = list(src.glob("*.rar")) + list(src.glob("*.zip")) + list(src.glob("*.7z"))
-    first_archive = None
+    archives = sorted(list(src.glob("*.rar")) + list(src.glob("*.zip")) + list(src.glob("*.7z")))
+    first = next((a for a in archives if re.search(r'\.part0*1\.rar$', a.name, re.I)), None)
+    if not first:
+        singles = [a for a in archives if not re.search(r'\.part\d+\.rar$', a.name, re.I)]
+        first = singles[0] if singles else None
+    if not first:
+        raise RuntimeError("Aucune archive trouvée dans " + str(src))
 
-    # Trie pour trouver .part01 ou .part1 en premier
-    for a in sorted(archives):
-        if ".part01." in a.name or ".part1." in a.name or ".part001." in a.name:
-            first_archive = a
+    tool = extract_tool()
+    if not tool:
+        raise RuntimeError("7-Zip ou unrar est nécessaire pour extraire ce repack")
+
+    emit_json({"event": "extract_start", "archive": first.name, "dest": str(dest), "tool": tool})
+    if tool == "unrar":
+        cmd = [tool, "x", "-o+", "-y", str(first), str(dest) + "/"]
+    else:
+        cmd = [tool, "x", "-y", "-bsp1", "-bso0", "-bse1", f"-o{dest}", str(first)]
+    p = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+    buf, last, tail = b"", -1, b""
+    while True:
+        ch = os.read(p.stdout.fileno(), 4096)          # rend dès que des données arrivent (pas d'attente de 4 Ko)
+        if not ch:
             break
-    if not first_archive and archives:
-        first_archive = archives[0]
+        tail = (tail + ch)[-2000:]
+        buf += ch
+        # 7-Zip et unrar réécrivent la même ligne avec \r ou \b : on lit le dernier pourcentage affiché
+        parts = re.split(rb"[\r\n\x08]", buf)
+        buf = parts[-1]
+        for part in parts[:-1] + [buf]:
+            m = re.search(rb"(\d{1,3})%", part)
+            if m:
+                pct = min(100, int(m.group(1)))
+                if pct != last:
+                    emit_json({"event": "extract_progress", "pct": pct})
+                    last = pct
+    if p.wait() != 0:
+        msg = tail.decode("utf-8", "replace").strip().splitlines()
+        raise RuntimeError("Extraction échouée : " + (msg[-1][:200] if msg else f"code {p.returncode}"))
 
-    emit_json({"event": "extract_start", "archive": str(first_archive) if first_archive else None, "dest": str(dest)})
-
-    if first_archive:
-        # Essaye 7z, puis unrar, puis bsdtar
-        cmd = None
-        if shutil.which("7z"):
-            cmd = ["7z", "x", "-y", f"-o{dest}", str(first_archive)]
-        elif shutil.which("unrar"):
-            cmd = ["unrar", "x", "-y", "-o+", str(first_archive), str(dest)]
-        elif shutil.which("bsdtar"):
-            cmd = ["bsdtar", "-xf", str(first_archive), "-C", str(dest)]
-
-        if cmd:
-            p = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
-            if p.returncode != 0:
-                emit_json({"event": "extract_error", "msg": f"Erreur extraction: {p.stderr[:300]}"})
-        else:
-            emit_json({"event": "extract_warning", "msg": "Aucun outil d'extraction (7z/bsdtar/unrar) disponible"})
-
-    # Recherche du setup.exe ou exécutable principal
-    setup_candidates = list(dest.rglob("setup*.exe")) + list(src.rglob("setup*.exe"))
-    if not setup_candidates:
-        setup_candidates = list(dest.rglob("*.exe")) + list(src.rglob("*.exe"))
-
-    found_setup = str(setup_candidates[0]) if setup_candidates else ""
-    emit_json({
-        "event": "extract_completed",
-        "dest": str(dest),
-        "setup_exe": found_setup,
-        "can_install": bool(found_setup)
-    })
-    return found_setup
+    cands = [f for f in dest.rglob("*") if f.is_file() and f.suffix.lower() == ".exe"]
+    setups = [f for f in cands if f.name.lower().startswith("setup")]
+    found = str(min(setups or cands, key=lambda f: len(f.parts))) if (setups or cands) else ""
+    emit_json({"event": "extract_completed", "dest": str(dest), "setup_exe": found, "can_install": bool(found)})
+    return found
 
 def emit_json(obj):
     print(json.dumps(obj), flush=True)

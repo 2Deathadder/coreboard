@@ -692,7 +692,7 @@ def extract_tool():
     return None
 
 
-def extract_archives(download_dir, extract_dir=None):
+def extract_archives(download_dir, extract_dir=None, delete_archives=False):
     """
     Extrait le repack (premier volume .part01.rar, ou archive unique) dans download_dir/extracted,
     avec la progression en direct, puis cherche l'installateur (setup.exe).
@@ -737,8 +737,23 @@ def extract_archives(download_dir, extract_dir=None):
                     emit_json({"event": "extract_progress", "pct": pct})
                     last = pct
     if p.wait() != 0:
-        msg = tail.decode("utf-8", "replace").strip().splitlines()
-        raise RuntimeError("Extraction échouée : " + (msg[-1][:200] if msg else f"code {p.returncode}"))
+        txt = re.sub(r"[\x00-\x09\x0b-\x1f]+", " ", tail.decode("utf-8", "replace").replace("\r", "\n"))
+        lines = [re.sub(r"\s+", " ", l).strip() for l in txt.splitlines()]
+        lines = [l for l in lines if l and not re.fullmatch(r"\d{1,3}%.*", l)]
+        err = next((l for l in reversed(lines) if re.search(r"error|erreur|cannot|can not|wrong|corrupt", l, re.I)), lines[-1] if lines else "")
+        raise RuntimeError("Extraction échouée : " + (err[:200] or f"code {p.returncode}"))
+
+    if delete_archives:                            # libère la place avant l'installation (le disque peut être juste)
+        freed = 0
+        vols = [a for a in archives if a == first or (re.search(r'\.part\d+\.rar$', a.name, re.I)
+                and re.sub(r'\.part\d+\.rar$', '', a.name, flags=re.I) == re.sub(r'\.part\d+\.rar$', '', first.name, flags=re.I))]
+        for a in vols:
+            try:
+                freed += a.stat().st_size
+                a.unlink()
+            except OSError:
+                pass
+        emit_json({"event": "archives_deleted", "count": len(vols), "bytes": freed})
 
     cands = [f for f in dest.rglob("*") if f.is_file() and f.suffix.lower() == ".exe"]
     setups = [f for f in cands if f.name.lower().startswith("setup")]
@@ -794,9 +809,10 @@ def main():
             run_download_job(job_file, dest)
 
         elif cmd == "extract":
-            d = sys.argv[2]
-            out = sys.argv[3] if len(sys.argv) > 3 else None
-            extract_archives(d, out)
+            args = [a for a in sys.argv[2:] if a != "--delete-archives"]
+            d = args[0]
+            out = args[1] if len(args) > 1 else None
+            extract_archives(d, out, delete_archives="--delete-archives" in sys.argv)
 
         else:
             print(f"Commande inconnue: {cmd}", file=sys.stderr)

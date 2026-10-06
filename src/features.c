@@ -1538,6 +1538,11 @@ static FgExStatus fg_ex;
 
 gboolean fx_fg_extract_tool(void) { return compat_has("7z") || compat_has("7zz") || compat_has("unrar"); }
 FgExStatus fx_fg_ex_status(void) { g_mutex_lock(&fg_ex_lock); FgExStatus s = fg_ex; g_mutex_unlock(&fg_ex_lock); return s; }
+void fx_fg_ex_set_done(const char *setup) {
+    g_mutex_lock(&fg_ex_lock);
+    if (!fg_ex.active) { memset(&fg_ex, 0, sizeof fg_ex); fg_ex.done = TRUE; fg_ex.pct = 100; g_strlcpy(fg_ex.setup, setup, sizeof fg_ex.setup); g_strlcpy(fg_ex.msg, "Archives déjà extraites", sizeof fg_ex.msg); }
+    g_mutex_unlock(&fg_ex_lock);
+}
 void fx_fg_ex_reset(void) { g_mutex_lock(&fg_ex_lock); if (!fg_ex.active) memset(&fg_ex, 0, sizeof fg_ex); g_mutex_unlock(&fg_ex_lock); }
 
 static void fg_ex_event(const char *line) {
@@ -1548,6 +1553,7 @@ static void fg_ex_event(const char *line) {
     const char *ev = jstr(o, "event");
     g_mutex_lock(&fg_ex_lock);
     if (!strcmp(ev, "extract_start")) { g_strlcpy(fg_ex.dest, jstr(o, "dest"), sizeof fg_ex.dest); g_strlcpy(fg_ex.msg, "Extraction…", sizeof fg_ex.msg); }
+    else if (!strcmp(ev, "archives_deleted")) g_strlcpy(fg_ex.msg, "Archives supprimées après l'extraction", sizeof fg_ex.msg);
     else if (!strcmp(ev, "extract_progress")) fg_ex.pct = (int)json_object_get_int_member_with_default(o, "pct", fg_ex.pct);
     else if (!strcmp(ev, "extract_completed")) {
         fg_ex.done = TRUE; fg_ex.pct = 100;
@@ -1559,9 +1565,10 @@ static void fg_ex_event(const char *line) {
     g_object_unref(jp);
 }
 
+static gboolean fg_ex_delete;
 static gpointer fg_ex_thread(gpointer d) {
     gchar *dir = d;
-    const char *argv[] = {"python3", fg_helper_path(), "extract", dir, NULL};
+    const char *argv[] = {"python3", fg_helper_path(), "extract", dir, fg_ex_delete ? "--delete-archives" : NULL, NULL};
     GSubprocess *proc = g_subprocess_newv(argv, G_SUBPROCESS_FLAGS_STDOUT_PIPE | G_SUBPROCESS_FLAGS_STDERR_SILENCE, NULL);
     if (proc) {
         GDataInputStream *dat = g_data_input_stream_new(g_subprocess_get_stdout_pipe(proc));
@@ -1579,9 +1586,10 @@ static gpointer fg_ex_thread(gpointer d) {
     return NULL;
 }
 
-void fx_fg_extract(const char *dir) {
+void fx_fg_extract(const char *dir, gboolean delete_archives) {
     g_mutex_lock(&fg_ex_lock);
     if (fg_ex.active) { g_mutex_unlock(&fg_ex_lock); return; }
+    fg_ex_delete = delete_archives;
     memset(&fg_ex, 0, sizeof fg_ex); fg_ex.active = TRUE;
     g_strlcpy(fg_ex.msg, "Préparation de l'extraction…", sizeof fg_ex.msg);
     g_mutex_unlock(&fg_ex_lock);

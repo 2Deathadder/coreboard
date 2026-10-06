@@ -7,6 +7,7 @@
 #include <glib/gstdio.h>
 #include <gdk-pixbuf/gdk-pixbuf.h>
 #include <unistd.h>
+#include <sys/statvfs.h>
 #include "features.h"
 #include "gamevisual.h"
 #include "hw.h"
@@ -2225,6 +2226,55 @@ static char fg_setup_exe[512];            /* installateur lancé (repéré par s
 static gboolean fg_auto_install;          /* « Extraire et installer » : lancer l'installateur dès la fin de l'extraction */
 static gint64 fg_del_confirm;             /* double clic de confirmation pour supprimer les archives */
 static gboolean fg_installed;             /* jeu installé et ajouté : les archives peuvent être supprimées */
+static char fg_tgt_dir[512], fg_tgt_title[128];
+static int fg_del_after = -1;              /* supprimer les archives après l'extraction : -1 automatique (selon l'espace libre), 0 non, 1 oui */
+
+/* espace libre et taille des archives du dossier : l'extraction puis l'installation demandent environ 3 fois les archives */
+static void fg_space(const char *dir, double *free_b, double *arch_b) {
+    struct statvfs sv; *free_b = statvfs(dir, &sv) == 0 ? (double)sv.f_bavail * sv.f_frsize : 0; *arch_b = 0;
+    GDir *g = g_dir_open(dir, 0, NULL); const char *f;
+    while (g && (f = g_dir_read_name(g))) if (g_str_has_suffix(f, ".rar") || g_str_has_suffix(f, ".7z") || g_str_has_suffix(f, ".zip")) {
+        GStatBuf sb; gchar *fp = g_build_filename(dir, f, NULL); if (g_stat(fp, &sb) == 0) *arch_b += sb.st_size; g_free(fp);
+    }
+    if (g) g_dir_close(g);
+}
+static gboolean fg_want_delete(const char *dir) {
+    if (fg_del_after >= 0) return fg_del_after;
+    double fb, ab; fg_space(dir, &fb, &ab);
+    return fb < ab * 3.7;                           /* extraction (≈ 1 × archives) + installation (jusqu'à ≈ 2,7 × archives) */
+}   /* jeu téléchargé à extraire / installer (téléchargement fini ou trouvé sur le disque) */
+
+/* jeux déjà téléchargés dans le dossier FitGirl : relus sur le disque, donc toujours visibles après un redémarrage */
+typedef struct { char name[128], path[512], setup[512]; int parts; gboolean complete, extracted; double bytes; } FgLocal;
+static FgLocal fg_local[16]; static int fg_nlocal; static gint64 fg_local_at;
+
+static void fg_scan_local(void) {
+    if (g_get_monotonic_time() - fg_local_at < 5 * G_USEC_PER_SEC) return;
+    fg_local_at = g_get_monotonic_time(); fg_nlocal = 0;
+    GDir *d = g_dir_open(fg_base_dir, 0, NULL); const char *n;
+    while (d && (n = g_dir_read_name(d)) && fg_nlocal < 16) {
+        gchar *path = g_build_filename(fg_base_dir, n, NULL);
+        GDir *g = g_file_test(path, G_FILE_TEST_IS_DIR) ? g_dir_open(path, 0, NULL) : NULL; const char *f;
+        FgLocal L; memset(&L, 0, sizeof L); L.complete = TRUE;
+        while (g && (f = g_dir_read_name(g))) {
+            if (g_str_has_suffix(f, ".part") || g_str_has_suffix(f, ".cbseg")) L.complete = FALSE;   /* partie en cours */
+            else if (g_str_has_suffix(f, ".rar") || g_str_has_suffix(f, ".bin") || g_str_has_suffix(f, ".7z") || g_str_has_suffix(f, ".zip")) {
+                GStatBuf sb; gchar *fp = g_build_filename(path, f, NULL);
+                if (g_stat(fp, &sb) == 0) L.bytes += sb.st_size;
+                g_free(fp); L.parts++;
+            } else if (!strcmp(f, "extracted")) L.extracted = TRUE;
+        }
+        if (g) g_dir_close(g);
+        if (L.extracted) {                                 /* installateur déjà extrait (archives éventuellement supprimées) */
+            gchar *sx = g_build_filename(path, "extracted", "setup.exe", NULL);
+            if (g_file_test(sx, G_FILE_TEST_IS_REGULAR)) g_strlcpy(L.setup, sx, sizeof L.setup);
+            g_free(sx);
+        }
+        if (L.parts || L.setup[0]) { g_strlcpy(L.name, n, sizeof L.name); g_strlcpy(L.path, path, sizeof L.path); fg_local[fg_nlocal++] = L; }
+        g_free(path);
+    }
+    if (d) g_dir_close(d);
+}
 
 static int wg_find(const char *exe) {
     int n; WinGame *w = wg_list(&n);
@@ -2318,19 +2368,25 @@ static void page_fitgirl(cairo_t *cr) {
     FgDlStatus st = fx_fg_dl_status();
     const char *page_url = fx_fg_page_url();
     gboolean busy_res = fx_fg_resolve_busy(), resolved = fx_fg_resolved();
-    gboolean show_card = *page_url || st.active || st.completed || st.error;
+    if (!fg_base_dir[0]) g_snprintf(fg_base_dir, sizeof fg_base_dir, "%s/Games/FitGirl", g_get_home_dir());
+    static gboolean was_completed;
+    if (st.completed && !was_completed) {                  /* téléchargement qui vient de finir : il devient le jeu à installer */
+        g_strlcpy(fg_tgt_dir, st.dest, sizeof fg_tgt_dir); g_strlcpy(fg_tgt_title, st.game, sizeof fg_tgt_title);
+    }
+    was_completed = st.completed;
+    gboolean show_card = *page_url || st.active || fg_tgt_dir[0] || st.error;
 
     /* ---- carte du jeu sélectionné / téléchargement ---- */
     if (show_card) {
-        const char *gtitle = st.active || st.completed ? st.game : fx_fg_game_title();
+        const char *gtitle = st.active ? st.game : fg_tgt_dir[0] ? fg_tgt_title : fx_fg_game_title();
         const char *rerr = fx_fg_resolve_error();
         int nfiles = fx_fg_file_count(), nopt = fx_fg_optional_count();
         char dest[512]; fg_game_dir(gtitle, dest, sizeof dest);
-        double ch = st.active ? 176 : 144;
+        double ch = st.active ? 176 : fg_tgt_dir[0] ? 158 : 144;
         panel(cr, X0, y, CW, ch, st.active);
         double px = X0 + 22, pw = CW - 44, bx = XR - 22;
 
-        section(cr, st.active ? "Téléchargement en cours" : st.completed ? "Téléchargement terminé" : "Jeu sélectionné", px, y + 24);
+        section(cr, st.active ? "Téléchargement en cours" : fg_tgt_dir[0] ? "Prêt à installer" : "Jeu sélectionné", px, y + 24);
         text_fit(cr, *gtitle ? gtitle : (busy_res ? "Recherche des liens…" : "—"), px, y + 54, 16, 700, F_SANS, C_TEXT, pw - 230, 0);
 
         if (st.active) {
@@ -2353,14 +2409,22 @@ static void page_fitgirl(cairo_t *cr) {
             if (outline_btn(cr, bx - 110, y + 12, 110, 28, "Pause", 12)) { fx_fg_cancel(); paused = TRUE; }
             { char sp[520]; fg_short_path(st.dest[0] ? st.dest : dest, sp, sizeof sp); text_fit(cr, sp, px, y + 160, 11.5, 400, F_SANS, C_MUTE, pw, 0); }
             schedule_redraw(500);
-        } else if (st.completed) {
+        } else if (fg_tgt_dir[0]) {
             FgExStatus ex = fx_fg_ex_status();
+            {
+                int s0 = fg_setup_exe[0] ? wg_find(fg_setup_exe) : -1; int n0; WinGame *w0 = wg_list(&n0);
+                if (!ex.active && !(s0 >= 0 && w0[s0].running) && outline_btn(cr, bx - 90, y + 10, 90, 24, "Fermer", 11.5)) {
+                    fg_tgt_dir[0] = 0; fx_fg_ex_reset(); fg_auto_install = FALSE; fg_local_at = 0;
+                    if (area) gtk_widget_queue_draw(area);
+                    return;
+                }
+            }
             int si = fg_setup_exe[0] ? wg_find(fg_setup_exe) : -1;
             int nwg; WinGame *wgl = wg_list(&nwg);
-            char sp[520], dm[600]; fg_short_path(st.dest, sp, sizeof sp);
+            char sp[520], dm[600]; fg_short_path(fg_tgt_dir, sp, sizeof sp);
             if (ex.done && !ex.error && fg_auto_install) {          /* enchaînement automatique après l'extraction */
                 fg_auto_install = FALSE;
-                fg_launch_setup(ex.setup, st.game);
+                fg_launch_setup(ex.setup, fg_tgt_title);
                 si = wg_find(fg_setup_exe);
             }
             if (ex.active) {
@@ -2371,40 +2435,52 @@ static void page_fitgirl(cairo_t *cr) {
                 schedule_redraw(500);
             } else if (ex.error) {
                 text_fit(cr, ex.msg, px, y + 84, 12.5, 600, F_SANS, C_RED, pw - 230, 0);
-                if (primary_btn(cr, bx - 190, y + 40, 190, 34, "Réessayer l'extraction")) { fg_auto_install = TRUE; fx_fg_extract(st.dest); }
-                if (outline_btn(cr, bx - 190, y + 86, 190, 28, "Ouvrir le dossier", 12)) open_path(st.dest);
+                if (primary_btn(cr, bx - 190, y + 40, 190, 34, "Réessayer l'extraction")) { fg_auto_install = TRUE; fx_fg_extract(fg_tgt_dir, fg_want_delete(fg_tgt_dir)); }
+                if (outline_btn(cr, bx - 190, y + 86, 190, 28, "Ouvrir le dossier", 12)) open_path(fg_tgt_dir);
             } else if (ex.done && si >= 0 && wgl[si].running) {
                 text(cr, "Installation en cours dans Wine : suis les étapes de l'installateur FitGirl.", px, y + 84, 12.5, 600, F_SANS, C_TEXT, 1, 0, 0);
                 text(cr, "Garde le dossier proposé (C:\\Games). L'installation peut prendre longtemps.", px, y + 106, 12, 400, F_SANS, C_MUTE, 1, 0, 0);
                 schedule_redraw(1000);
             } else if (ex.done && si >= 0) {
                 text(cr, "✓  Installateur terminé. Choisis l'exécutable du jeu (dans C:\\Games) pour l'ajouter à Jeux Windows.", px, y + 84, 12.5, 600, F_SANS, C_OK, 1, 0, 0);
-                if (primary_btn(cr, bx - 190, y + 40, 190, 34, "Ajouter le jeu installé")) pick_fg_game_exe(st.game);
+                if (primary_btn(cr, bx - 190, y + 40, 190, 34, "Ajouter le jeu installé")) pick_fg_game_exe(fg_tgt_title);
                 if (outline_btn(cr, bx - 190, y + 86, 190, 28, "Relancer l'installateur", 12)) { wg_launch(si); }
             } else if (ex.done && fg_installed) {
                 text(cr, "✓  Jeu installé et ajouté à « Jeux Windows ».", px, y + 84, 12.5, 600, F_SANS, C_OK, 1, 0, 0);
                 if (primary_btn(cr, bx - 190, y + 40, 190, 34, "Ouvrir Jeux Windows")) page = 12;
             } else if (ex.done) {
                 text(cr, "✓  Archives extraites.", px, y + 84, 12.5, 600, F_SANS, C_OK, 1, 0, 0);
-                if (primary_btn(cr, bx - 190, y + 40, 190, 34, "Lancer l'installateur")) fg_launch_setup(ex.setup, st.game);
+                if (primary_btn(cr, bx - 190, y + 40, 190, 34, "Lancer l'installateur")) fg_launch_setup(ex.setup, fg_tgt_title);
             } else {
-                g_snprintf(dm, sizeof dm, "✓  Toutes les parties sont téléchargées dans %s", sp);
+                g_snprintf(dm, sizeof dm, "✓  Toutes les parties sont dans %s", sp);
                 text_fit(cr, dm, px, y + 84, 12.5, 600, F_SANS, C_OK, pw - 230, 0);
                 if (fx_fg_extract_tool()) {
-                    text(cr, "Extraction des archives puis installation du jeu dans Wine (Proton-GE).", px, y + 106, 12, 400, F_SANS, C_MUTE, 1, 0, 0);
-                    if (primary_btn(cr, bx - 190, y + 40, 190, 34, "Extraire et installer")) { fg_auto_install = TRUE; fx_fg_extract(st.dest); }
+                    double fb, ab; fg_space(fg_tgt_dir, &fb, &ab);
+                    char a1[32], a2[32], ln[200]; fmt_size(a1, sizeof a1, fb); fmt_size(a2, sizeof a2, ab);
+                    gboolean del = fg_want_delete(fg_tgt_dir), tight = fb < ab * 3.7, short_ = fb < ab * 2.7;
+                    g_snprintf(ln, sizeof ln, "Espace libre : %s · archives : %s%s", a1, a2,
+                               short_ ? " — insuffisant, même en supprimant les archives" : tight ? " — supprime les archives après l'extraction" : "");
+                    text(cr, ln, px, y + 106, 12, short_ ? 600 : 400, F_SANS, short_ ? C_RED : tight ? 0xe0a800 : C_MUTE, 1, 0, 0);
+                    if (small_btn(cr, px, y + 118 - 4, 300, del ? "✓ Supprimer les archives après l'extraction" : "Supprimer les archives après l'extraction", del))
+                        fg_del_after = !del;
+                    if (primary_btn(cr, bx - 190, y + 40, 190, 34, "Extraire et installer")) { fg_auto_install = TRUE; fx_fg_extract(fg_tgt_dir, fg_want_delete(fg_tgt_dir)); }
                 } else {
                     text(cr, "7-Zip est nécessaire pour extraire les archives RAR de FitGirl.", px, y + 106, 12, 400, F_SANS, C_LABEL, 1, 0, 0);
                     if (primary_btn(cr, bx - 190, y + 40, 190, 34, pkg_busy ? "Installation…" : "Installer 7-Zip") && !pkg_busy) install_pkg_async("7zip", "7-Zip");
                 }
-                if (outline_btn(cr, bx - 190, y + 86, 190, 28, "Ouvrir le dossier", 12)) open_path(st.dest);
+                if (outline_btn(cr, bx - 190, y + 86, 190, 28, "Ouvrir le dossier", 12)) open_path(fg_tgt_dir);
             }
             /* libérer l'espace : archives et fichiers extraits ne servent plus une fois le jeu installé */
             if (fg_installed && ex.done) {
                 gboolean armed = g_get_monotonic_time() < fg_del_confirm;
                 if (outline_btn(cr, px, y + 112, 300, 24, armed ? "Confirmer : supprimer le dossier téléchargé" : "Libérer l'espace (supprimer les archives)", 11.5)) {
                     if (!armed) { fg_del_confirm = g_get_monotonic_time() + 4 * G_USEC_PER_SEC; schedule_redraw(4100); }
-                    else { fg_del_confirm = 0; show_toast(fg_delete_download(st.dest) ? "Archives supprimées" : "Suppression refusée (dossier inattendu)"); }
+                    else {
+                        fg_del_confirm = 0;
+                        gboolean ok = fg_delete_download(fg_tgt_dir);
+                        show_toast(ok ? "Archives supprimées" : "Suppression refusée (dossier inattendu)");
+                        if (ok) { fg_tgt_dir[0] = 0; fg_installed = FALSE; fx_fg_ex_reset(); fg_local_at = 0; }
+                    }
                 }
             }
         } else if (busy_res) {
@@ -2435,6 +2511,40 @@ static void page_fitgirl(cairo_t *cr) {
             }
         }
         y += ch + 24;
+    }
+
+    /* ---- jeux téléchargés sur le disque ---- */
+    fg_scan_local();
+    int shown = 0;
+    for (int i = 0; i < fg_nlocal; i++) if (strcmp(fg_local[i].path, fg_tgt_dir) && !(st.active && !strcmp(fg_local[i].path, st.dest))) shown++;
+    if (shown) {
+        section(cr, "Mes téléchargements", X0, y + 8);
+        y += 28;
+        FgExStatus exs = fx_fg_ex_status();
+        int si2 = fg_setup_exe[0] ? wg_find(fg_setup_exe) : -1; int nw2; WinGame *wl2 = wg_list(&nw2);
+        gboolean busy = exs.active || (si2 >= 0 && wl2[si2].running) || st.active;   /* une installation à la fois */
+        for (int i = 0; i < fg_nlocal; i++) {
+            FgLocal *L = &fg_local[i];
+            if (!strcmp(L->path, fg_tgt_dir) || (st.active && !strcmp(L->path, st.dest))) continue;
+            panel(cr, X0, y, CW, 64, FALSE);
+            text_fit(cr, L->name, X0 + 20, y + 22, 14, 600, F_SANS, C_TEXT, CW - 280, 0);
+            char sz[32], info[160]; fmt_size(sz, sizeof sz, L->bytes);
+            if (L->parts) g_snprintf(info, sizeof info, "%d partie%s · %s · %s", L->parts, L->parts > 1 ? "s" : "", sz,
+                                     !L->complete ? "téléchargement incomplet" : L->setup[0] ? "déjà extrait" : "complet");
+            else g_snprintf(info, sizeof info, "Archives extraites puis supprimées · prêt à installer");
+            text(cr, info, X0 + 20, y + 44, 12, 400, F_SANS, L->complete ? C_LABEL : 0xe0a800, 1, 0, 0);
+            if (!L->complete) text(cr, "Sélectionne le jeu dans la recherche pour reprendre", XR - 20, y + 32, 11.5, 400, F_SANS, C_MUTE, 1, 2, 0);
+            else if (busy) text(cr, "Une installation est déjà en cours", XR - 20, y + 32, 11.5, 400, F_SANS, C_MUTE, 1, 2, 0);
+            else if (primary_btn(cr, XR - 20 - 200, y + 15, 200, 34, L->setup[0] ? "Lancer l'installateur" : "Préparer l'installation")) {
+                g_strlcpy(fg_tgt_dir, L->path, sizeof fg_tgt_dir); g_strlcpy(fg_tgt_title, L->name, sizeof fg_tgt_title);
+                fx_fg_ex_reset(); fg_installed = FALSE; fg_setup_exe[0] = 0; fg_del_confirm = 0;
+                if (L->setup[0]) { fx_fg_ex_set_done(L->setup); fg_launch_setup(L->setup, L->name); }          /* pas de nouvelle extraction */
+                /* sinon : la carte affiche l'espace disque et l'option de suppression avant de lancer l'extraction */
+                if (area) gtk_widget_queue_draw(area);
+            }
+            y += 64 + 10;
+        }
+        y += 16;
     }
 
     /* ---- résultats de recherche ---- */
@@ -2478,6 +2588,7 @@ static void page_fitgirl(cairo_t *cr) {
             else if (!locked && outline_btn(cr, x + 16, ry + 52, cw - 32, 28, "Sélectionner", 12)) {
                 paused = FALSE;
                 fg_installed = FALSE; fg_auto_install = FALSE; fg_del_confirm = 0;
+                if (!fx_fg_ex_status().active && !(fg_setup_exe[0] && wg_find(fg_setup_exe) >= 0)) { fg_tgt_dir[0] = 0; fx_fg_ex_reset(); }
                 fx_fg_resolve(hits[i].page_url);
                 if (area) gtk_widget_queue_draw(area);
             } else if (locked) {                   /* bouton grisé : un seul téléchargement à la fois */

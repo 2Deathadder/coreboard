@@ -162,9 +162,10 @@ typedef struct {
     char msg[200], setup[512], dest[512];
 } FgExStatus;
 gboolean fx_fg_extract_tool(void);               /* 7z, 7zz ou unrar présent */
-void     fx_fg_extract(const char *dir);         /* lance en tâche de fond */
+void     fx_fg_extract(const char *dir, gboolean delete_archives);   /* lance en tâche de fond ; archives supprimées après succès si demandé */
 FgExStatus fx_fg_ex_status(void);
 void     fx_fg_ex_reset(void);
+void     fx_fg_ex_set_done(const char *setup);    /* archives déjà extraites : installateur connu */
 
 #endif
 

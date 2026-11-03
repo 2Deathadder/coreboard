@@ -1,6 +1,8 @@
 PREFIX ?= $(HOME)/.local
 # démon root : dossier appartenant à root (paquet : /usr/lib/coreboard)
 FAND_DIR ?= /usr/local/libexec/coreboard
+# unités systemd utilisateur (minuterie de mise à jour de Proton-GE)
+USERUNITDIR ?= $(if $(filter /usr,$(PREFIX)),/usr/lib/systemd/user,$(PREFIX)/share/systemd/user)
 PKGS   := gtk4 json-glib-1.0 fontconfig gio-unix-2.0
 CFLAGS ?= -O2
 CFLAGS += -std=gnu11 -Wall -Wextra -Wno-unused-parameter -DDATADIR=\"$(PREFIX)/share/coreboard\" -DFAND_DIR=\"$(FAND_DIR)\" $(shell pkg-config --cflags $(PKGS))
@@ -55,7 +57,13 @@ install: coreboard
 	install -Dm644 icon.svg $(D)/share/icons/hicolor/scalable/apps/coreboard.svg
 	install -Dm644 data/coreboard.desktop $(D)/share/applications/coreboard.desktop
 	sed -i 's|^Exec=.*|Exec=$(PREFIX)/bin/coreboard|' $(D)/share/applications/coreboard.desktop
-	@if [ -z "$(DESTDIR)" ]; then update-desktop-database $(D)/share/applications 2>/dev/null; gtk-update-icon-cache -q -t $(D)/share/icons/hicolor 2>/dev/null; \
+	# mise à jour automatique de Proton-GE, même sans ouvrir Coreboard (activée pour toutes les sessions)
+	install -Dm644 data/coreboard-proton-update.service $(DESTDIR)$(USERUNITDIR)/coreboard-proton-update.service
+	install -Dm644 data/coreboard-proton-update.timer $(DESTDIR)$(USERUNITDIR)/coreboard-proton-update.timer
+	sed -i 's|^ExecStart=.*|ExecStart=$(PREFIX)/bin/coreboard --update-proton|' $(DESTDIR)$(USERUNITDIR)/coreboard-proton-update.service
+	install -d $(DESTDIR)$(USERUNITDIR)/timers.target.wants
+	ln -sf ../coreboard-proton-update.timer $(DESTDIR)$(USERUNITDIR)/timers.target.wants/coreboard-proton-update.timer
+	@if [ -z "$(DESTDIR)" ]; then systemctl --user daemon-reload 2>/dev/null; systemctl --user start coreboard-proton-update.timer 2>/dev/null; update-desktop-database $(D)/share/applications 2>/dev/null; gtk-update-icon-cache -q -t $(D)/share/icons/hicolor 2>/dev/null; \
 	  echo "Coreboard installé dans $(PREFIX) (bin/coreboard). Vérifie que $(PREFIX)/bin est dans ton PATH."; fi; true
 
 # fichiers système d'un paquet (PKGBUILD, avec DESTDIR) : démon root, règle udev du clavier RGB, licence
@@ -67,6 +75,8 @@ install-system:
 
 uninstall:
 	rm -rf $(D)/share/coreboard/fonts $(D)/share/coreboard/sounds $(D)/share/coreboard/fistgirl_helper.py $(D)/share/coreboard/get_ff_link.py $(D)/bin/coreboard $(D)/share/applications/coreboard.desktop $(D)/share/icons/hicolor/scalable/apps/coreboard.svg
+	-systemctl --user disable --now coreboard-proton-update.timer 2>/dev/null
+	rm -f $(DESTDIR)$(USERUNITDIR)/coreboard-proton-update.service $(DESTDIR)$(USERUNITDIR)/coreboard-proton-update.timer $(DESTDIR)$(USERUNITDIR)/timers.target.wants/coreboard-proton-update.timer
 	-update-desktop-database $(D)/share/applications 2>/dev/null
 
 .PHONY: install install-system uninstall

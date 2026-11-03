@@ -1,0 +1,11 @@
+[Unit]
+Description=Coreboard : vérifie les mises à jour de Proton-GE (10 min après l'ouverture de session, puis toutes les 6 h)
+
+[Timer]
+OnStartupSec=10min
+OnUnitActiveSec=6h
+RandomizedDelaySec=15min
+Persistent=true
+
+[Install]
+WantedBy=timers.target

@@ -1,0 +1,12 @@
+[Unit]
+Description=Coreboard : mise à jour de Proton-GE en arrière-plan
+Documentation=https://github.com/2Deathadder/coreboard
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/coreboard --update-proton
+# priorité minimale : ne gêne ni le bureau ni un jeu
+Nice=19
+IOSchedulingClass=idle
+CPUSchedulingPolicy=idle
+TimeoutStartSec=3h

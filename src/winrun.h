@@ -42,5 +42,6 @@ gboolean wg_installing(void);
 typedef struct { int state; gint64 done, total; char msg[160]; } WgDl;   /* state : 0 inactif, 1 recherche, 2 téléchargement, 3 extraction, 4 terminé, 5 échec */
 WgDl wg_dl(void);
 void wg_install_proton_async(void);
+int wg_update_proton_cli(void);          /* coreboard --update-proton : vérifie et installe la dernière version, sans interface */
 gboolean wg_download_running(void);       /* un téléchargement est en cours (dans ce processus ou un autre) */
 #endif

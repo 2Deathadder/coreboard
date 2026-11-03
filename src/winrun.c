@@ -1,4 +1,5 @@
 /* Coreboard — adaptateur Windows (Proton-GE via umu-launcher) */
+#define _GNU_SOURCE
 #include "winrun.h"
 #include "compat.h"
 #include "pe.h"
@@ -208,6 +209,48 @@ static gboolean proton_installed(void) {
     return FALSE;
 }
 
+/* dossier de la version Proton-GE la plus récente installée (NULL si aucune) */
+static gchar *latest_proton_dir(void) {
+    gchar *best = NULL, *bestname = NULL;
+    const char *roots[] = {".local/share/Steam/compatibilitytools.d", ".local/share/umu/compatibilitytools", NULL};
+    for (int r = 0; roots[r]; r++) {
+        gchar *d = g_build_filename(g_get_home_dir(), roots[r], NULL); GDir *dir = g_dir_open(d, 0, NULL); const char *f;
+        while (dir && (f = g_dir_read_name(dir))) {
+            if (!g_str_has_prefix(f, "GE-Proton")) continue;
+            gchar *full = g_build_filename(d, f, NULL), *exe = g_build_filename(full, "proton", NULL);
+            if (g_file_test(exe, G_FILE_TEST_IS_REGULAR) && (!bestname || strverscmp(f, bestname) > 0)) { g_free(best); g_free(bestname); best = full; bestname = g_strdup(f); full = NULL; }
+            g_free(full); g_free(exe);
+        }
+        if (dir) g_dir_close(dir);
+        g_free(d);
+    }
+    g_free(bestname);
+    return best;
+}
+
+/* un jeu Windows tourne-t-il (n'importe quel lanceur) ? on ne touche alors pas à Proton */
+static gboolean game_running(void) {
+    const char *argv[] = {"pgrep", "-f", "umu-run|wineserver|pressure-vessel", NULL}; gint st = 1;
+    return g_spawn_sync(NULL, (char **)argv, NULL, G_SPAWN_SEARCH_PATH | G_SPAWN_STDOUT_TO_DEV_NULL | G_SPAWN_STDERR_TO_DEV_NULL, NULL, NULL, NULL, NULL, &st, NULL) && g_spawn_check_wait_status(st, NULL);
+}
+
+/* garde les deux versions Proton-GE les plus récentes (la précédente sert de secours), supprime les autres */
+static void prune_old_protons(void) {
+    if (game_running()) return;
+    gchar *ct = g_build_filename(g_get_home_dir(), ".local/share/Steam/compatibilitytools.d", NULL);
+    GDir *dir = g_dir_open(ct, 0, NULL); const char *f; GPtrArray *v = g_ptr_array_new_with_free_func(g_free);
+    while (dir && (f = g_dir_read_name(dir))) if (g_str_has_prefix(f, "GE-Proton")) g_ptr_array_add(v, g_strdup(f));
+    if (dir) g_dir_close(dir);
+    for (guint i = 0; i < v->len; i++) for (guint j = i + 1; j < v->len; j++)        /* tri décroissant par version */
+        if (strverscmp(v->pdata[i], v->pdata[j]) < 0) { gpointer t = v->pdata[i]; v->pdata[i] = v->pdata[j]; v->pdata[j] = t; }
+    for (guint i = 2; i < v->len; i++) {
+        gchar *full = g_build_filename(ct, v->pdata[i], NULL); const char *a[] = {"rm", "-rf", "--", full, NULL};
+        g_spawn_sync(NULL, (char **)a, NULL, G_SPAWN_SEARCH_PATH, NULL, NULL, NULL, NULL, NULL, NULL);
+        g_free(full);
+    }
+    g_ptr_array_free(v, TRUE); g_free(ct);
+}
+
 WgTools wg_tools(void) {
     WgTools t = {compat_has("umu-run"), proton_installed(), compat_has("gamemoderun"), compat_has("mangohud")};
     return t;
@@ -286,7 +329,9 @@ void wg_launch(int i) {
     char id[32]; g_snprintf(id, sizeof id, "umu-%d", w->appid);
     env = g_environ_setenv(env, "WINEPREFIX", w->prefix, TRUE);
     env = g_environ_setenv(env, "GAMEID", id, TRUE);
-    env = g_environ_setenv(env, "PROTONPATH", "GE-Proton", TRUE);
+    /* version installée précise : umu ne vérifie ni ne télécharge plus Proton au lancement
+       (la mise à jour se fait en arrière-plan : coreboard --update-proton, minuterie systemd) */
+    { gchar *pp = latest_proton_dir(); env = g_environ_setenv(env, "PROTONPATH", pp ? pp : "GE-Proton", TRUE); g_free(pp); }
     env = g_environ_setenv(env, "STORE", "none", TRUE);
     env = g_environ_setenv(env, "CB_LOG", logp, TRUE);
     /* GPU NVIDIA dédié (portables hybrides) + cache de shaders durable */
@@ -335,6 +380,14 @@ void wg_launch(int i) {
     g_ptr_array_add(a, g_strdup("sh")); g_ptr_array_add(a, g_strdup("-c")); g_ptr_array_add(a, g_strdup("exec \"$@\" >>\"$CB_LOG\" 2>&1")); g_ptr_array_add(a, g_strdup("sh"));
     if (w->gamemode && compat_has("gamemoderun")) g_ptr_array_add(a, g_strdup("gamemoderun"));
     if (use_hud) g_ptr_array_add(a, g_strdup("mangohud"));
+    if (compat_has("powerprofilesctl")) {                              /* profil « performance » tenu le temps du jeu, rétabli à la fermeture */
+        gchar *out = NULL; const char *pl[] = {"powerprofilesctl", "list", NULL};
+        if (g_spawn_sync(NULL, (char **)pl, NULL, G_SPAWN_SEARCH_PATH | G_SPAWN_STDERR_TO_DEV_NULL, NULL, NULL, &out, NULL, NULL, NULL) && out && strstr(out, "performance:")) {
+            const char *pp[] = {"powerprofilesctl", "launch", "-p", "performance", "-r", "Coreboard : jeu en cours", "--"};
+            for (guint k = 0; k < G_N_ELEMENTS(pp); k++) g_ptr_array_add(a, g_strdup(pp[k]));
+        }
+        g_free(out);
+    }
     g_ptr_array_add(a, g_strdup("umu-run")); g_ptr_array_add(a, g_strdup(w->exe));
     if (w->args[0]) { gchar **av; gint ac; if (g_shell_parse_argv(w->args, &ac, &av, NULL)) { for (int k = 0; k < ac; k++) g_ptr_array_add(a, g_strdup(av[k])); g_strfreev(av); } }
     g_ptr_array_add(a, NULL);
@@ -436,6 +489,17 @@ static gpointer dl_worker(gpointer d) {
         }
         g_free(out);
     }
+    gboolean api_ok = url != NULL;
+    if (url) {                                                      /* déjà installée : rien à télécharger */
+        gchar *dn = g_strndup(name, strlen(name) - 7), *dp = g_build_filename(g_get_home_dir(), ".local/share/Steam/compatibilitytools.d", dn, "proton", NULL);
+        gboolean have = g_file_test(dp, G_FILE_TEST_IS_REGULAR);
+        if (have) { char m[160]; g_snprintf(m, sizeof m, "Proton-GE est à jour (%s)", dn); dl_set(4, -1, -1, m); }
+        g_free(dn); g_free(dp);
+        if (have) { g_free(url); g_free(name); g_mutex_lock(&dl_lock); dl_busy = FALSE; g_mutex_unlock(&dl_lock); return NULL; }
+    } else if (proton_installed()) {                                /* GitHub injoignable : on garde la version en place */
+        dl_set(5, -1, -1, "Impossible de vérifier les mises à jour de Proton-GE (GitHub injoignable)");
+        g_mutex_lock(&dl_lock); dl_busy = FALSE; g_mutex_unlock(&dl_lock); return NULL;
+    }
     if (!url) { name = g_strdup("GE-Proton11-7-x86_64.tar.gz"); url = g_strdup("https://github.com/GloriousEggroll/proton-ge-custom/releases/download/GE-Proton11-7/GE-Proton11-7-x86_64.tar.gz"); size = 563784602; }
 
     gchar *dd = data_dir("downloads"), *part = g_build_filename(dd, name, NULL);
@@ -478,12 +542,25 @@ static gpointer dl_worker(gpointer d) {
         g_free(ct);
         if (tst == 0) { g_unlink(part); installed = TRUE; } else { g_unlink(part); fail = "Extraction impossible (archive corrompue)"; }
     }
+    if (installed && api_ok) prune_old_protons();
     dl_set(installed ? 4 : 5, -1, -1, installed ? "Proton-GE installé" : fail);
     g_free(sumurl);
     { gchar *lp = lock_path(); g_unlink(lp); g_free(lp); }
     g_free(url); g_free(name); g_free(dd); g_free(part);
     g_mutex_lock(&dl_lock); dl_busy = FALSE; g_mutex_unlock(&dl_lock);
     return NULL;
+}
+
+/* mise à jour silencieuse (minuterie systemd) : rien si un jeu tourne, sinon télécharge la nouvelle version s'il y en a une */
+int wg_update_proton_cli(void) {
+    if (game_running()) { g_print("Un jeu est en cours : mise à jour de Proton-GE remise à plus tard.\n"); return 0; }
+    wg_install_proton_async();
+    int last = -1;
+    for (;;) {
+        g_usleep(2 * G_USEC_PER_SEC); WgDl d = wg_dl();
+        if (d.state && d.state != last) { g_print("%s\n", d.msg); last = d.state; }
+        if (d.state >= 4) return d.state == 4 ? 0 : 1;
+    }
 }
 
 void wg_install_proton_async(void) {

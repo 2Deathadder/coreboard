@@ -78,7 +78,7 @@ tr('<a class="lang" href="en/" hreflang="en" lang="en">EN</a>', '<a class="lang"
 tr('href="#installation">Installer</a>', 'href="#installation">Install</a>')
 
 # --- héros
-tr('Jeux FitGirl installés automatiquement, sans aucune fenêtre', 'FitGirl games installed automatically, with no windows at all')
+tr('Proton-GE mis à jour tout seul en arrière-plan, petits jeux FitGirl fiabilisés', 'Proton-GE updates itself in the background, small FitGirl games made reliable')
 tr('<span class="sr-only">Coreboard : </span>Le centre de contrôle matériel natif pour Linux', '<span class="sr-only">Coreboard: </span>The native hardware control center for Linux')
 tr("Performances, processeur, GPU, écran, éclairage RGB, scénarios et jeux&nbsp;: tout ton PC dans une seule application rapide, écrite en C et GTK4.",
    "Performance, CPU, GPU, display, RGB lighting, scenarios and games: your whole PC in one fast app, written in C and GTK4.")
@@ -115,7 +115,7 @@ tr("Enregistre des séquences de touches, rejoue-les avec répétitions et assig
 tr("<h3>Bibliothèque de jeux</h3>", "<h3>Game library</h3>")
 tr("Steam, Epic (Legendary), GOG, Lutris et applications de jeu, réunis et lançables d'un clic.", "Steam, Epic (Legendary), GOG, Lutris and game apps, gathered and launched in one click.")
 tr("<h3>Jeux Windows</h3>", "<h3>Windows games</h3>")
-tr("Proton-GE et umu-launcher, DLSS, ray tracing, GameMode, MangoHud et un diagnostic qui optimise le système.", "Proton-GE and umu-launcher, DLSS, ray tracing, GameMode, MangoHud and a check-up that tunes your system.")
+tr("Proton-GE et umu-launcher, mis à jour tout seuls en arrière-plan, mode performance pendant le jeu, DLSS, ray tracing, GameMode, MangoHud et un diagnostic qui optimise le système.", "Proton-GE and umu-launcher, updated on their own in the background, performance mode while playing, DLSS, ray tracing, GameMode, MangoHud and a check-up that tunes your system.")
 tr("Recherche, téléchargement segmenté reprenable, extraction et installation dans Wine. <a href=\"#fitgirl\">En savoir plus</a>", "Search, resumable multi-connection download, extraction and installation in Wine. <a href=\"#fitgirl\">Learn more</a>")
 
 # --- captures
@@ -139,10 +139,10 @@ tr("Du repack au jeu installé, sans quitter Coreboard", "From repack to install
 tr("Recherche un repack FitGirl, télécharge-le et installe-le dans Wine en quelques clics. Plus besoin de gestionnaire de téléchargement ni de manipulations dans le terminal.",
    "Search for a FitGirl repack, download it and install it in Wine in a few clicks. No download manager, no terminal juggling.")
 tr("<b>Rechercher</b><span>Les résultats du catalogue FitGirl s'affichent directement dans l'application.", "<b>Search</b><span>Results from the FitGirl catalog show up right inside the app.")
-tr("<b>Télécharger</b><span>Huit connexions par fichier, reprise exacte après une coupure, une pause ou un redémarrage. Les fichiers optionnels (voix, bonus) sont ignorés.",
-   "<b>Download</b><span>Eight connections per file, exact resume after a dropout, a pause or a reboot. Optional files (voices, bonus) are skipped.")
-tr("<b>Extraire et installer</b><span>7-Zip extrait les archives, puis l'installation se fait toute seule, sans aucune fenêtre, dans Wine (Proton-GE) avec un préfixe propre au jeu. La progression s'affiche dans Coreboard.",
-   "<b>Extract and install</b><span>7-Zip extracts the archives, then installation runs on its own, with no windows at all, in Wine (Proton-GE) with a dedicated prefix. Progress shows in Coreboard.")
+tr("<b>Télécharger</b><span>Huit connexions par fichier, reprise exacte après une coupure, une pause ou un redémarrage. Chaque partie attendue est vérifiée avant l'extraction. Les fichiers optionnels (voix, bonus) sont ignorés.",
+   "<b>Download</b><span>Eight connections per file, exact resume after a dropout, a pause or a reboot. Every expected part is checked before extraction. Optional files (voices, bonus) are skipped.")
+tr("<b>Extraire et installer</b><span>7-Zip extrait les archives (une extraction interrompue est refaite proprement, l'installateur corrigé fourni par FitGirl est utilisé s'il existe), puis l'installation se fait toute seule, sans aucune fenêtre, dans Wine (Proton-GE) avec un préfixe propre au jeu. La progression s'affiche dans Coreboard.",
+   "<b>Extract and install</b><span>7-Zip extracts the archives (an interrupted extraction is redone cleanly, and FitGirl's fixed installer is used when there is one), then installation runs on its own, with no windows at all, in Wine (Proton-GE) with a dedicated prefix. Progress shows in Coreboard.")
 tr("<b>Jouer</b><span>Le jeu rejoint « Jeux Windows » avec DLSS, GameMode et MangoHud. Les archives peuvent ensuite être supprimées pour libérer l'espace.",
    "<b>Play</b><span>The game joins “Windows games” with DLSS, GameMode and MangoHud. Archives can then be deleted to free up space.")
 tr("Respecte le droit d'auteur de ton pays&nbsp;: télécharge uniquement des jeux que tu as le droit d'utiliser. Coreboard n'est pas affilié à FitGirl Repacks et n'héberge aucun fichier.",

@@ -46,7 +46,7 @@
   "applicationCategory": "UtilitiesApplication",
   "applicationSubCategory": "System utility",
   "operatingSystem": "Linux",
-  "softwareVersion": "1.0.5",
+  "softwareVersion": "1.0.6",
   "license": "https://www.gnu.org/licenses/gpl-3.0.html",
   "url": "https://2deathadder.github.io/coreboard/",
   "downloadUrl": "https://github.com/2Deathadder/coreboard/releases/latest",
@@ -261,7 +261,7 @@ footer nav { display: flex; gap: 20px; flex-wrap: wrap; }
 <section class="hero" id="accueil">
   <canvas id="pixels" aria-hidden="true"></canvas>
   <div class="hero-content">
-    <a class="pill" href="https://github.com/2Deathadder/coreboard/releases/latest"><b>v1.0.5</b> Jeux FitGirl installés automatiquement, sans aucune fenêtre <span aria-hidden="true">→</span></a>
+    <a class="pill" href="https://github.com/2Deathadder/coreboard/releases/latest"><b>v1.0.6</b> Proton-GE mis à jour tout seul en arrière-plan, petits jeux FitGirl fiabilisés <span aria-hidden="true">→</span></a>
     {{WORDMARK}}
     <h1><span class="sr-only">Coreboard : </span>Le centre de contrôle matériel natif pour Linux</h1>
     <p class="lead">Performances, processeur, GPU, écran, éclairage RGB, scénarios et jeux&nbsp;: tout ton PC dans une seule application rapide, écrite en C et GTK4.</p>
@@ -341,7 +341,7 @@ footer nav { display: flex; gap: 20px; flex-wrap: wrap; }
       <article class="card">
         <div class="ico"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M3 5l8-1.5v8H3zM13 3.2L21 2v9.5h-8zM3 13h8v8L3 19.5zM13 13h8v9l-8-1.3z"/></svg></div>
         <h3>Jeux Windows</h3>
-        <p>Proton-GE et umu-launcher, DLSS, ray tracing, GameMode, MangoHud et un diagnostic qui optimise le système.</p>
+        <p>Proton-GE et umu-launcher, mis à jour tout seuls en arrière-plan, mode performance pendant le jeu, DLSS, ray tracing, GameMode, MangoHud et un diagnostic qui optimise le système.</p>
       </article>
       <article class="card">
         <div class="ico"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 3v12m0 0l-5-5m5 5l5-5M4 21h16"/></svg></div>
@@ -380,8 +380,8 @@ footer nav { display: flex; gap: 20px; flex-wrap: wrap; }
       <p class="section-lead">Recherche un repack FitGirl, télécharge-le et installe-le dans Wine en quelques clics. Plus besoin de gestionnaire de téléchargement ni de manipulations dans le terminal.</p>
       <ol class="steps">
         <li><div><b>Rechercher</b><span>Les résultats du catalogue FitGirl s'affichent directement dans l'application.</span></div></li>
-        <li><div><b>Télécharger</b><span>Huit connexions par fichier, reprise exacte après une coupure, une pause ou un redémarrage. Les fichiers optionnels (voix, bonus) sont ignorés.</span></div></li>
-        <li><div><b>Extraire et installer</b><span>7-Zip extrait les archives, puis l'installation se fait toute seule, sans aucune fenêtre, dans Wine (Proton-GE) avec un préfixe propre au jeu. La progression s'affiche dans Coreboard.</span></div></li>
+        <li><div><b>Télécharger</b><span>Huit connexions par fichier, reprise exacte après une coupure, une pause ou un redémarrage. Chaque partie attendue est vérifiée avant l'extraction. Les fichiers optionnels (voix, bonus) sont ignorés.</span></div></li>
+        <li><div><b>Extraire et installer</b><span>7-Zip extrait les archives (une extraction interrompue est refaite proprement, l'installateur corrigé fourni par FitGirl est utilisé s'il existe), puis l'installation se fait toute seule, sans aucune fenêtre, dans Wine (Proton-GE) avec un préfixe propre au jeu. La progression s'affiche dans Coreboard.</span></div></li>
         <li><div><b>Jouer</b><span>Le jeu rejoint « Jeux Windows » avec DLSS, GameMode et MangoHud. Les archives peuvent ensuite être supprimées pour libérer l'espace.</span></div></li>
       </ol>
       <p class="legal">Respecte le droit d'auteur de ton pays&nbsp;: télécharge uniquement des jeux que tu as le droit d'utiliser. Coreboard n'est pas affilié à FitGirl Repacks et n'héberge aucun fichier.</p>

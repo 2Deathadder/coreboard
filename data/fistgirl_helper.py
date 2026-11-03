@@ -641,6 +641,37 @@ def safe_filename(name, idx):
     name = re.sub(r'[\x00-\x1f]', '', name)
     return name or f"part{idx+1:02d}.bin"
 
+MANIFEST = ".coreboard-job.json"          # liste des fichiers attendus : un dossier n'est « complet » que s'ils y sont tous
+EXTRACT_OK = ".coreboard-extracted"       # écrit à la fin d'une extraction réussie (contient le chemin de l'installateur)
+
+
+def write_manifest(target_path, data):
+    tmp = Path(target_path) / (MANIFEST + ".tmp")
+    tmp.write_text(json.dumps(data, ensure_ascii=False))
+    os.replace(tmp, Path(target_path) / MANIFEST)
+
+
+def missing_files(src):
+    """Fichiers attendus absents ou inachevés : d'après le manifeste, sinon d'après la numérotation des volumes RAR."""
+    src = Path(src)
+    missing = [p.name[:-5] for p in src.glob("*.part")]          # téléchargements segmentés en cours
+    try:
+        man = json.loads((src / MANIFEST).read_text())
+        missing += [n for n in man.get("files", []) if not (src / n).is_file() and n not in missing]
+        if missing or man.get("complete"):
+            return missing
+    except (OSError, ValueError):
+        pass
+    groups = {}                                                     # sans manifeste : volumes .partN.rar consécutifs
+    for a in src.glob("*.rar"):
+        m = re.match(r'(.*)\.part(\d+)\.rar$', a.name, re.I)
+        if m:
+            groups.setdefault(m.group(1), set()).add(int(m.group(2)))
+    for base, nums in groups.items():
+        missing += [f"{base}.part{i}.rar" for i in range(1, max(nums) + 1) if i not in nums]
+    return missing
+
+
 def run_download_job(resolved_json_path, target_dir):
     """
     Lit le fichier de description résolu et télécharge chaque partie (segmentée, reprenable).
@@ -655,6 +686,8 @@ def run_download_job(resolved_json_path, target_dir):
     total_files = len(files)
     game_title = job.get("title", "Jeu")
 
+    names = [safe_filename(item.get("name", ""), i) for i, item in enumerate(files)]
+    write_manifest(target_path, {"title": game_title, "files": names, "complete": False})
     emit_json({"event": "job_start", "title": game_title, "file_count": total_files, "dest": str(target_path),
                "conns": SEG_CONNS})
 
@@ -679,6 +712,7 @@ def run_download_job(resolved_json_path, target_dir):
         emit_json({"event": "file_cached" if cached else "file_done",
                    "file": fname, "file_index": idx, "file_count": total_files})
 
+    write_manifest(target_path, {"title": game_title, "files": names, "complete": True})
     emit_json({"event": "job_completed", "title": game_title, "total_bytes": total_done, "dest": str(target_path)})
 
 # -----------------------------------------------------------------------------
@@ -708,6 +742,15 @@ def extract_archives(download_dir, extract_dir=None, delete_archives=False):
         first = singles[0] if singles else None
     if not first:
         raise RuntimeError("Aucune archive trouvée dans " + str(src))
+    miss = missing_files(src)
+    if miss:
+        raise RuntimeError(f"Téléchargement incomplet : {len(miss)} partie(s) manquante(s) ({miss[0]}…) — relance le téléchargement du jeu")
+
+    # extraction propre : une extraction précédente interrompue ne doit rien laisser derrière elle
+    if not extract_dir and dest.exists():
+        shutil.rmtree(dest, ignore_errors=True)
+    dest.mkdir(parents=True, exist_ok=True)
+    (dest / EXTRACT_OK).unlink(missing_ok=True)
 
     tool = extract_tool()
     if not tool:
@@ -757,7 +800,18 @@ def extract_archives(download_dir, extract_dir=None, delete_archives=False):
 
     cands = [f for f in dest.rglob("*") if f.is_file() and f.suffix.lower() == ".exe"]
     setups = [f for f in cands if f.name.lower().startswith("setup")]
-    found = str(min(setups or cands, key=lambda f: len(f.parts))) if (setups or cands) else ""
+    best = min(setups or cands, key=lambda f: len(f.parts)) if (setups or cands) else None
+    # installateur corrigé fourni à part par FitGirl (ex. « setup-fixed.exe ») : il remplace celui de l'archive,
+    # à côté de ses fichiers fg-*.bin
+    loose = sorted([f for f in src.glob("*.exe") if f.name.lower().startswith("setup")], key=lambda f: ("fix" not in f.name.lower(), f.name))
+    if loose and best is not None:
+        fixed = best.parent / loose[0].name
+        shutil.copy2(loose[0], fixed)
+        best = fixed
+        emit_json({"event": "fixed_setup", "setup_exe": str(fixed)})
+    found = str(best) if best else ""
+    if found:
+        (dest / EXTRACT_OK).write_text(found)
     emit_json({"event": "extract_completed", "dest": str(dest), "setup_exe": found, "can_install": bool(found)})
     return found
 

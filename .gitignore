@@ -3,3 +3,4 @@ tests/hwtest
 *.o
 *.log
 .DS_Store
+__pycache__/

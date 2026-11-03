@@ -2274,6 +2274,34 @@ static void fg_installed_store(const char *dir, const char *exe) {
 typedef struct { char name[128], path[512], setup[512], game[512]; int parts; gboolean complete, extracted; double bytes; } FgLocal;
 static FgLocal fg_local[16]; static int fg_nlocal; static gint64 fg_local_at;
 
+/* parties attendues absentes : d'après le manifeste du téléchargement, sinon d'après la numérotation des volumes .partN.rar */
+static gboolean fg_missing_parts(const char *path) {
+    gboolean miss = FALSE;
+    gchar *mf = g_build_filename(path, ".coreboard-job.json", NULL);
+    JsonParser *jp = json_parser_new();
+    if (json_parser_load_from_file(jp, mf, NULL) && JSON_NODE_HOLDS_OBJECT(json_parser_get_root(jp))) {
+        JsonObject *o = json_node_get_object(json_parser_get_root(jp));
+        JsonArray *fa = json_object_has_member(o, "files") ? json_object_get_array_member(o, "files") : NULL;
+        for (guint i = 0; fa && i < json_array_get_length(fa) && !miss; i++) {
+            gchar *fp = g_build_filename(path, json_array_get_string_element(fa, i), NULL);
+            if (!g_file_test(fp, G_FILE_TEST_IS_REGULAR)) miss = TRUE;
+            g_free(fp);
+        }
+        g_object_unref(jp); g_free(mf);
+        return miss;
+    }
+    g_object_unref(jp); g_free(mf);
+    int maxn = 0, count = 0; GDir *g = g_dir_open(path, 0, NULL); const char *f;
+    while (g && (f = g_dir_read_name(g))) {
+        const char *p = g_strrstr(f, ".part"); char *end;
+        if (!p || !g_str_has_suffix(f, ".rar")) continue;
+        long n = strtol(p + 5, &end, 10);
+        if (end != p + 5 && !g_ascii_strcasecmp(end, ".rar") && n > 0) { count++; if (n > maxn) maxn = (int)n; }
+    }
+    if (g) g_dir_close(g);
+    return count < maxn;                                     /* volumes 1…max non consécutifs */
+}
+
 static void fg_scan_local(void) {
     if (g_get_monotonic_time() - fg_local_at < 5 * G_USEC_PER_SEC) return;
     fg_local_at = g_get_monotonic_time(); fg_nlocal = 0;
@@ -2291,10 +2319,18 @@ static void fg_scan_local(void) {
             } else if (!strcmp(f, "extracted")) L.extracted = TRUE;
         }
         if (g) g_dir_close(g);
+        if (L.complete && L.parts && fg_missing_parts(path)) L.complete = FALSE;   /* une partie n'a jamais été téléchargée */
         if (L.extracted) {                                 /* installateur déjà extrait (archives éventuellement supprimées) */
-            gchar *sx = g_build_filename(path, "extracted", "setup.exe", NULL);
-            if (g_file_test(sx, G_FILE_TEST_IS_REGULAR)) g_strlcpy(L.setup, sx, sizeof L.setup);
-            g_free(sx);
+            /* extraction réussie = marqueur écrit par le helper ; sans lui (anciennes versions) : seulement si les
+               archives ont été supprimées, ce qui n'arrive qu'après une extraction réussie. Sinon elle a été interrompue. */
+            gchar *mk = g_build_filename(path, "extracted", ".coreboard-extracted", NULL), *txt = NULL;
+            if (g_file_get_contents(mk, &txt, NULL, NULL)) { g_strstrip(txt); if (g_file_test(txt, G_FILE_TEST_IS_REGULAR)) g_strlcpy(L.setup, txt, sizeof L.setup); }
+            else if (!L.parts) {
+                gchar *sx = g_build_filename(path, "extracted", "setup.exe", NULL);
+                if (g_file_test(sx, G_FILE_TEST_IS_REGULAR)) g_strlcpy(L.setup, sx, sizeof L.setup);
+                g_free(sx);
+            }
+            g_free(txt); g_free(mk);
         }
         { gchar *ge = fg_installed_lookup(path); if (ge) { g_strlcpy(L.game, ge, sizeof L.game); g_free(ge); } }
         if (L.parts || L.setup[0]) { g_strlcpy(L.name, n, sizeof L.name); g_strlcpy(L.path, path, sizeof L.path); fg_local[fg_nlocal++] = L; }
@@ -3296,6 +3332,8 @@ int main(int argc, char **argv) {
             if (i + 1 >= argc) { g_printerr("Usage : coreboard --macro NOM\n"); return 2; }
             return mx_play_by_name(argv[i + 1]);
         }
+    for (int i = 1; i < argc; i++)
+        if (!strcmp(argv[i], "--update-proton")) return wg_update_proton_cli();
     for (int i = 1; i < argc; i++)
         if (!strcmp(argv[i], "--install-proton")) {
             wg_install_proton_async();
